@@ -1,0 +1,88 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+
+      # Runs a single command using the runners shell
+      - name: Run a one-line script
+        run: echo Hello, world!
+
+      # Runs a set of commands using the runners shell
+      - name: Run a multi-line script
+        run: |
+          echo Add other actions to build,
+          echo test, and deploy your project.
+name: Unpack tax.zip
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_message:
+        description: 'Commit message'
+        required: false
+        default: 'Unpack tax.zip into repository root'
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Install unzip
+        run: sudo apt-get update && sudo apt-get install -y unzip
+
+      - name: Unzip tax.zip to repository root, remove zip and commit
+        env:
+          COMMIT_MSG: "${{ github.event.inputs.commit_message }}"
+        run: |
+          if [ -f tax.zip ]; then
+            echo "Found tax.zip, unpacking into repository root (overwriting existing files)..."
+            unzip -o tax.zip -d .
+            echo "Removing tax.zip from repo..."
+            rm -f tax.zip
+
+            echo "Configuring git user..."
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            git add -A
+
+            # Only commit if there are staged changes
+            if git diff --cached --quiet; then
+              echo "No changes detected after unzip. Nothing to commit."
+            else
+              git commit -m "${COMMIT_MSG}"
+              echo "Pushing commit to the default branch..."
+              git push
+            fi
+          else
+            echo "tax.zip not found in repository root. Exiting with non-zero status."
+            exit 1
+          fi
