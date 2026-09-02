@@ -1,0 +1,128 @@
+name: Deploy Runner (EKS / Linkerd / Vault)
+
+# Triggert bei Push auf main. Zusaetzlich manuell startbar (workflow_dispatch),
+# z.B. um den Vault/Linkerd/k8s-Teil erneut auszufuehren ohne einen Dummy-Commit.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Verhindert, dass zwei Laeufe gleichzeitig versuchen, denselben Cluster
+# anzulegen oder zu aendern (Race Condition bei schnellen aufeinanderfolgenden Pushes).
+concurrency:
+  group: deploy-runner-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  CLUSTER_NAME: us-expat-tax
+  RUNNER_IMAGE: expat-tax-runner:ci
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: AWS-Credentials konfigurieren
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Runner-Image bauen (dockerfile.runner)
+        run: docker build -f dockerfile.runner -t "${{ env.RUNNER_IMAGE }}" .
+
+      # Alle folgenden Infrastruktur-Schritte laufen INNERHALB des soeben gebauten
+      # Runner-Images, damit exakt die Tool-Versionen aus dockerfile.runner genutzt
+      # werden (kubectl, eksctl, helm, linkerd, aws-cli).
+      - name: EKS-Cluster idempotent sicherstellen
+        run: |
+          docker run --rm \
+            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -e AWS_DEFAULT_REGION="${{ env.AWS_REGION }}" \
+            -e CLUSTER_NAME="${{ env.CLUSTER_NAME }}" \
+            -v "$PWD":/workspace \
+            "${{ env.RUNNER_IMAGE }}" -c '
+              set -euo pipefail
+              if eksctl get cluster --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION" >/dev/null 2>&1; then
+                echo "Cluster $CLUSTER_NAME existiert bereits - erstelle nicht neu."
+              else
+                echo "Cluster $CLUSTER_NAME nicht gefunden - erstelle neuen Cluster."
+                eksctl create cluster \
+                  --name "$CLUSTER_NAME" \
+                  --region "$AWS_DEFAULT_REGION" \
+                  --nodes 2 \
+                  --node-type t3.medium \
+                  --managed
+              fi
+              aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
+            '
+
+      - name: Linkerd Service Mesh idempotent installieren
+        run: |
+          docker run --rm \
+            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -e AWS_DEFAULT_REGION="${{ env.AWS_REGION }}" \
+            -e CLUSTER_NAME="${{ env.CLUSTER_NAME }}" \
+            -v "$PWD":/workspace \
+            "${{ env.RUNNER_IMAGE }}" -c '
+              set -euo pipefail
+              aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
+              if kubectl get ns linkerd >/dev/null 2>&1; then
+                echo "Linkerd bereits installiert - upgrade statt Neuinstallation."
+                linkerd upgrade | kubectl apply -f -
+              else
+                echo "Linkerd noch nicht vorhanden - Erstinstallation."
+                linkerd install --crds | kubectl apply -f -
+                linkerd install | kubectl apply -f -
+              fi
+              linkerd check
+            '
+
+      - name: Vault (Helm) idempotent installieren/aktualisieren
+        run: |
+          docker run --rm \
+            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -e AWS_DEFAULT_REGION="${{ env.AWS_REGION }}" \
+            -e CLUSTER_NAME="${{ env.CLUSTER_NAME }}" \
+            -v "$PWD":/workspace \
+            "${{ env.RUNNER_IMAGE }}" -c '
+              set -euo pipefail
+              aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
+              helm repo add hashicorp https://helm.releases.hashicorp.com 2>/dev/null || true
+              helm repo update
+              # helm upgrade --install ist von Natur aus idempotent:
+              # Erstinstallation, falls das Release "vault" im Namespace "vault" noch nicht existiert,
+              # sonst ein normales Upgrade auf denselben/neuen Wertestand.
+              kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
+              helm upgrade --install vault hashicorp/vault \
+                --namespace vault \
+                --wait --timeout 5m
+            '
+
+      - name: Kubernetes-Manifeste anwenden (falls vorhanden)
+        run: |
+          docker run --rm \
+            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -e AWS_DEFAULT_REGION="${{ env.AWS_REGION }}" \
+            -e CLUSTER_NAME="${{ env.CLUSTER_NAME }}" \
+            -v "$PWD":/workspace \
+            "${{ env.RUNNER_IMAGE }}" -c '
+              set -euo pipefail
+              aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
+              if [ -d "k8s" ] && [ -n "$(ls -A k8s 2>/dev/null)" ]; then
+                echo "k8s/-Manifeste gefunden - wende an."
+                kubectl apply -f k8s/
+              else
+                echo "Kein k8s/-Ordner mit Manifesten vorhanden - Schritt wird uebersprungen."
+                echo "Sobald Anwendungscode + Manifeste im Repo liegen, wird dieser Schritt automatisch aktiv."
+              fi
+            '
