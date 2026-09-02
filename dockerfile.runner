@@ -1,0 +1,27 @@
+# Dockerfile.runner
+FROM alpine:3.19
+
+# Installiere System-Abhängigkeiten und CLIs
+RUN apk add --no-cache curl python3 py3-pip git bash curl gettext
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && ./aws/install && rm -rf awscliv2.zip aws
+
+# Installiere kubectl
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+    chmod +x kubectl && mv kubectl /usr/local/bin/
+
+# Installiere eksctl
+RUN curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" | tar xz -C /tmp && \
+    mv /tmp/eksctl /usr/local/bin/
+
+# Installiere Helm
+RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# Installiere Linkerd CLI
+RUN curl --proto '=https' --tlsv1.2 -sSf https://run.linkerd.io/install | sh
+ENV PATH=$PATH:/root/.linkerd2/bin
+
+WORKDIR /workspace
+COPY . /workspace
+
+ENTRYPOINT ["bash"]
