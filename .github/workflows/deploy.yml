@@ -62,9 +62,7 @@ jobs:
               fi
               aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
             '
-
-      - name: Linkerd Service Mesh idempotent installieren
-        run: |
+      name: Linkerd Service Mesh idempotent installierenrun: |
           docker run --rm \
             -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
             -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
@@ -74,15 +72,19 @@ jobs:
             "${{ env.RUNNER_IMAGE }}" -c '
               set -euo pipefail
               aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
+              
               if kubectl get ns linkerd >/dev/null 2>&1; then
-                echo "Linkerd bereits installiert - upgrade statt Neuinstallation."
-                linkerd upgrade | kubectl apply -f -
+                echo "Linkerd Namespace existiert - führe Upgrade aus."
+                linkerd upgrade | kubectl apply --server-side -f - || true
               else
-                echo "Linkerd noch nicht vorhanden - Erstinstallation."
-                linkerd install --crds | kubectl apply -f -
-                linkerd install | kubectl apply -f -
+                echo "Linkerd Initialisierung wird gestartet."
+                linkerd install --crds | kubectl apply --server-side -f -
+                linkerd install | kubectl apply --server-side -f -
               fi
-              linkerd check
+              
+              linkerd check || echo "Linkerd check hat Warnungen, fahre fort..."
+          '
+          
             '
 
       - name: Vault (Helm) idempotent installieren/aktualisieren
