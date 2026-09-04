@@ -62,7 +62,9 @@ jobs:
               fi
               aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_DEFAULT_REGION"
             '
-      name: Linkerd Service Mesh idempotent installierenrun: |
+
+      - name: Linkerd Service Mesh idempotent installieren
+        run: |
           docker run --rm \
             -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
             -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
@@ -83,8 +85,6 @@ jobs:
               fi
               
               linkerd check || echo "Linkerd check hat Warnungen, fahre fort..."
-          '
-          
             '
 
       - name: Vault (Helm) idempotent installieren/aktualisieren
@@ -128,3 +128,4 @@ jobs:
                 echo "Sobald Anwendungscode + Manifeste im Repo liegen, wird dieser Schritt automatisch aktiv."
               fi
             '
+            
