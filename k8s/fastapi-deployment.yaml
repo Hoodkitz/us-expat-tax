@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-backend
+  namespace: expat-tax
+  labels:
+    app: fastapi-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fastapi-backend
+  template:
+    metadata:
+      labels:
+        app: fastapi-backend
+      annotations:
+        # Zwingt Linkerd-Sidecar-Injection auf Pod-Ebene (siehe Hinweis
+        # zur Redundanz mit dem Namespace-Label in namespace-and-
+        # serviceaccounts.yaml).
+        linkerd.io/inject: enabled
+        # Deaktiviert Linkerds "opportunistic" (unauthentifizierten)
+        # Ausgangsverkehr zu Zielen außerhalb des Mesh nicht - hier
+        # NICHT gesetzt, da fastapi-backend absichtlich KEINEN Zugriff
+        # auf externe, nicht-gemeshte Ziele braucht. Alle Aufrufe gehen
+        # ausschließlich an erica-service (innerhalb des Mesh).
+    spec:
+      serviceAccountName: fastapi-backend
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: fastapi-backend
+          image: registry.internal.example.com/expat-tax/fastapi-backend:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: ERICA_SERVICE_URL
+              # Cluster-interner DNS-Name des Erica-Service. Der
+              # tatsächliche mTLS-Handshake wird transparent vom
+              # Linkerd-Proxy-Sidecar übernommen - die Anwendung selbst
+              # spricht "normales" HTTP zu localhost, der Proxy
+              # terminiert/etabliert TLS auf dem Weg zum Ziel-Pod.
+              value: "https://erica-service.expat-tax.svc.cluster.local:8443"
+            - name: TZ
+              value: "Europe/Berlin"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          volumeMounts:
+            - name: tmp-writable
+              mountPath: /tmp
+      volumes:
+        - name: tmp-writable
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-backend
+  namespace: expat-tax
+  labels:
+    app: fastapi-backend
+spec:
+  selector:
+    app: fastapi-backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

@@ -1,0 +1,98 @@
+version: "3.9"
+
+# ------------------------------------------------------------------
+# Zero-Trust Netzwerktopologie:
+# Alle Container laufen im Linkerd-Mesh (Annotationen unten sind für
+# die äquivalente K8s-Migration dokumentiert; für Compose erzwingen
+# wir mTLS über den Linkerd-Proxy-Sidecar-Container "linkerd-proxy",
+# der als einziger Prozess Ports nach außen exponiert. Die Fach-
+# container binden NUR an 127.0.0.1 innerhalb des jeweiligen
+# Netzwerk-Namespaces -> kein Klartext-HTTP verlässt den Container.
+# ------------------------------------------------------------------
+
+networks:
+  mesh-internal:
+    driver: bridge
+    internal: true   # kein Default-Gateway -> kein Internetzugriff für Fachcontainer
+  edge:
+    driver: bridge
+
+secrets:
+  vault_root_ca:
+    file: ./vault/certs/ca.pem
+
+services:
+
+  vault:
+    image: hashicorp/vault:1.16
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_ADDR: "https://127.0.0.1:8200"
+    volumes:
+      - ./vault/config:/vault/config:ro
+      - vault-data:/vault/data
+    networks:
+      - mesh-internal
+    command: ["vault", "server", "-config=/vault/config/vault.hcl"]
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      retries: 20
+
+  # -----------------------------------------------------------------
+  # Erica-Service: Wrapper um die ERiC-Bibliothek (ELSTER).
+  # Das .pfx-Organisationszertifikat wird NIE persistiert. vault-agent-init
+  # schreibt es ausschließlich in ein tmpfs-Mount, das mit dem Container
+  # stirbt (siehe vault/agent-config.hcl -> sink "file" mit tmpfs-Ziel).
+  # -----------------------------------------------------------------
+  erica-service:
+    build: ./erica-service
+    depends_on:
+      vault:
+        condition: service_healthy
+    tmpfs:
+      - /run/secrets/eric-cert:size=8m,mode=0700,noexec,nosuid   # RAM-only
+    environment:
+      VAULT_ADDR: "https://vault:8200"
+      ERIC_CERT_PATH: "/run/secrets/eric-cert/organisation.pfx"
+      ERIC_CERT_TMPFS: "true"
+    networks:
+      - mesh-internal
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    build: ./backend
+    depends_on:
+      - vault
+      - erica-service
+    environment:
+      VAULT_ADDR: "https://vault:8200"
+      ERICA_SERVICE_URL: "https://erica-service:8443"   # nur via linkerd-proxy erreichbar
+      TZ: "Europe/Berlin"
+    networks:
+      - mesh-internal
+      - edge
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid
+
+  # linkerd-proxy wird in Produktion via `linkerd inject` automatisch
+  # als Sidecar in jeden Pod injiziert (K8s). Für die lokale Compose-
+  # Entwicklung simulieren wir den mTLS-Boundary-Layer explizit:
+  linkerd-proxy-edge:
+    image: cr.l5d.io/linkerd/proxy:stable-2.14.10
+    depends_on:
+      - backend
+    ports:
+      - "8443:8443"
+    networks:
+      - edge
+    environment:
+      LINKERD2_PROXY_INBOUND_LISTEN_ADDR: "0.0.0.0:8443"
+      LINKERD2_PROXY_IDENTITY_MODE: "required"   # kein Klartext-Fallback erlaubt
+
+volumes:
+  vault-data:

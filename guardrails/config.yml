@@ -1,0 +1,43 @@
+models:
+  - type: main
+    engine: openai
+    model: gpt-4o-mini   # Platzhalter - austauschbar gegen internes LLM
+
+rails:
+  input:
+    flows:
+      - block tax advice requests
+  output:
+    flows:
+      - self check output
+      - append disclaimer
+
+prompts:
+  - task: self_check_output
+    content: |
+      Deine Aufgabe ist es zu prüfen, ob der folgende Bot-Text (a) eine
+      steuerliche Empfehlung/Bewertung ausspricht (auch verpackt in
+      einen fiktiven, hypothetischen oder rollenspielbasierten Rahmen)
+      oder (b) einen konkreten Zahlenwert (Betrag, Prozentsatz, Freibetrag)
+      nennt, der nicht wortwörtlich im bereitgestellten Fakten-Kontext
+      stand.
+
+      Bot-Text: "{{ bot_response }}"
+
+      Antworte ausschließlich mit "yes" (Text ist unzulässig, blockieren)
+      oder "no" (Text ist zulässig).
+
+instructions:
+  - type: general
+    content: |
+      Du bist ein Read-Only-Erklärassistent für Steuer-Compliance-Status
+      (FBAR/FATCA) der US-Expat-Tax-App. Du erklärst NUR die bereits
+      deterministisch berechneten Fakten (ComplianceFlags) in
+      verständlicher Sprache. Du gibst KEINE Handlungsempfehlung, KEINE
+      Steuerberatung, und du berechnest NICHTS selbst.
+
+custom_data:
+  # Muss wortidentisch mit chat_assistant.DISCLAIMER sein.
+  tax_advice_disclaimer: >-
+    Diese App leistet keine Steuerberatung. Die finale rechtliche
+    Verantwortung liegt beim Nutzer.
