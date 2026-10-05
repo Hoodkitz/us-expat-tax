@@ -1,0 +1,74 @@
+# -----------------------------------------------------------------------
+# Zero-Trust-Baseline: erst ALLES verbieten, dann exakt das erlauben,
+# was betrieblich notwendig ist. NetworkPolicies wirken auf L3/L4
+# (IP/Port) - sie sind KEIN Ersatz für die Linkerd-Identitätsprüfung
+# weiter unten, sondern die erste von zwei unabhängigen Verteidigungs-
+# schichten (Defense in Depth): selbst wenn ein Angreifer einen
+# gültigen Linkerd-Proxy-Zertifikat fälschen könnte (praktisch nicht
+# möglich), würde die NetworkPolicy den Layer-3/4-Zugriff bereits vorher
+# blockieren, und umgekehrt.
+# -----------------------------------------------------------------------
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-ingress
+  namespace: expat-tax
+spec:
+  podSelector: {}   # gilt für ALLE Pods im Namespace
+  policyTypes:
+    - Ingress
+  # Kein "ingress:"-Block -> impliziert Deny-All als Startzustand.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: erica-service-allow-ingress-from-fastapi-only
+  namespace: expat-tax
+spec:
+  podSelector:
+    matchLabels:
+      app: erica-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: fastapi-backend
+      ports:
+        - protocol: TCP
+          port: 8443
+    # Linkerd-Control-Plane braucht Zugriff für mTLS-Handshake-Metadaten
+    # und Proxy-Health-Checks. Ohne diese Ausnahme würde der Linkerd-
+    # Proxy selbst (der im selben Pod-Netzwerk-Namespace läuft) korrekt
+    # funktionieren, ABER Prometheus-Scraping durch linkerd-viz (falls
+    # installiert) würde geblockt. Explizit als separate Regel gehalten,
+    # damit sie bei Bedarf isoliert entfernt werden kann.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: linkerd
+      ports:
+        - protocol: TCP
+          port: 4191   # Linkerd-Proxy-Admin/Health-Port
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fastapi-backend-allow-ingress-from-anywhere-in-cluster
+  namespace: expat-tax
+spec:
+  # Der FastAPI-Backend-Pod ist der einzige Ingress-Punkt für Clients
+  # außerhalb des Mesh (z.B. ein API-Gateway/Ingress-Controller in
+  # einem anderen Namespace). Diese Regel bewusst offener gehalten,
+  # aber weiterhin auf den definierten Port beschränkt.
+  podSelector:
+    matchLabels:
+      app: fastapi-backend
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8000

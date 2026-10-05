@@ -1,0 +1,190 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erica-service
+  namespace: expat-tax
+  labels:
+    app: erica-service
+spec:
+  # Bewusst KEINE horizontale Skalierung > 1 ohne weitere Prüfung: der
+  # ERiC-Wrapper hält unter Umständen zustandsbehaftete Sitzungen zur
+  # ELSTER-Schnittstelle. Für dieses Modul reicht 1 Replica; Skalierung
+  # ist ein separates Thema für eine spätere Iteration (Session-Affinity
+  # / Sticky Routing über den Saga-Submission-UUID-Header).
+  replicas: 1
+  selector:
+    matchLabels:
+      app: erica-service
+  template:
+    metadata:
+      labels:
+        app: erica-service
+      annotations:
+        linkerd.io/inject: enabled
+    spec:
+      serviceAccountName: erica-service
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10002
+        fsGroup: 10002
+        seccompProfile:
+          type: RuntimeDefault
+
+      # -----------------------------------------------------------------
+      # INIT-CONTAINER: rendert das Zertifikat EINMALIG, BEVOR der
+      # Haupt-Container startet. Kubernetes garantiert strukturell, dass
+      # dieser Container erfolgreich terminieren MUSS, bevor reguläre
+      # Container überhaupt gestartet werden - das ist die primäre
+      # Absicherung gegen die Race Condition (siehe Erklärung am Ende
+      # dieser Antwort).
+      # -----------------------------------------------------------------
+      initContainers:
+        - name: vault-agent-init
+          image: hashicorp/vault:1.16
+          command:
+            - "vault"
+            - "agent"
+            - "-config=/vault/config/agent.hcl"
+            - "-exit-after-auth=true"   # terminiert nach erfolgreichem Rendering
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: vault-agent-config
+              mountPath: /vault/config
+              readOnly: true
+            - name: eric-cert-tmpfs
+              mountPath: /vault/secrets   # RAM-backed, siehe Volume-Definition unten
+
+      containers:
+        # -------------------------------------------------------------
+        # SIDECAR: derselbe Vault-Agent, aber im Dauerbetrieb (kein
+        # -exit-after-auth), damit das Zertifikat bei Ablauf/Rotation
+        # automatisch erneuert wird, solange der Pod lebt.
+        # -------------------------------------------------------------
+        - name: vault-agent-sidecar
+          image: hashicorp/vault:1.16
+          command:
+            - "vault"
+            - "agent"
+            - "-config=/vault/config/agent.hcl"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: vault-agent-config
+              mountPath: /vault/config
+              readOnly: true
+            - name: eric-cert-tmpfs
+              mountPath: /vault/secrets
+
+        # -------------------------------------------------------------
+        # HAUPT-CONTAINER: nutzt vault_backoff.py als Entrypoint-Gate
+        # (zweite, unabhängige Verteidigungslinie gegen die Race
+        # Condition, siehe Docstring in vault_backoff.py).
+        # -------------------------------------------------------------
+        - name: erica-service
+          image: registry.internal.example.com/expat-tax/erica-service:0.1.0
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "/app/vault_backoff.py", "--"]
+          args: ["/usr/local/bin/eric-wrapper-server", "--port", "8443"]
+          ports:
+            - name: eric
+              containerPort: 8443
+          env:
+            - name: ERIC_CERT_PATH
+              value: "/vault/secrets/elster.pfx"
+            - name: VAULT_CERT_WAIT_MAX_RETRIES
+              value: "12"
+            - name: VAULT_CERT_WAIT_BASE_DELAY_S
+              value: "1.0"
+            - name: VAULT_CERT_WAIT_MAX_DELAY_S
+              value: "30.0"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: eric-cert-tmpfs
+              mountPath: /vault/secrets
+              readOnly: true   # Haupt-Container darf das Zertifikat NUR lesen
+            - name: tmp-writable
+              mountPath: /tmp
+
+          # Readiness-Probe als DRITTE, unabhängige Absicherung: selbst
+          # falls der Prozess aus irgendeinem Grund vor Cert-Bestätigung
+          # laufen würde, bekommt er über den Kubernetes-Service KEINEN
+          # Traffic, bis die Datei nachweislich existiert und nicht leer
+          # ist. Der Linkerd-Proxy hält Verbindungen zurück, bis der Pod
+          # als Ready markiert ist.
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "test -s /vault/secrets/elster.pfx"]
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "test -s /vault/secrets/elster.pfx"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+
+      volumes:
+        - name: vault-agent-config
+          configMap:
+            name: erica-vault-agent-config
+        - name: eric-cert-tmpfs
+          # KERNANFORDERUNG: RAM-only. 'medium: Memory' erzeugt ein
+          # tmpfs auf dem Node - das Zertifikat berührt zu keinem
+          # Zeitpunkt einen persistenten Datenträger. sizeLimit
+          # verhindert, dass ein kompromittierter Prozess diesen
+          # RAM-Bereich unbegrenzt wachsen lässt (Node-Stabilität).
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Mi
+        - name: tmp-writable
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: erica-service
+  namespace: expat-tax
+  labels:
+    app: erica-service
+spec:
+  selector:
+    app: erica-service
+  ports:
+    - name: eric
+      port: 8443
+      targetPort: eric

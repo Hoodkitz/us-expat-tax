@@ -1,0 +1,45 @@
+# -----------------------------------------------------------------------
+# Linkerd-Policy-CRDs (policy.linkerd.io/v1beta1, Linkerd 2.11+ mit
+# aktiviertem Policy-Controller). Diese Ressourcen wirken auf der
+# mTLS-Identitätsebene, NICHT nur auf IP/Port wie NetworkPolicy:
+#
+#   - "Server" markiert den Port 8443 des erica-service-Pods als
+#     TLS-only. Linkerd lehnt jede Verbindung ab, die nicht über den
+#     meshed mTLS-Kanal kommt (kein Klartext-Fallback möglich).
+#   - "ServerAuthorization" erlaubt eingehenden Traffic auf diesem
+#     Server AUSSCHLIESSLICH von Clients, deren kryptografisch
+#     verifizierte Linkerd-Identität exakt der ServiceAccount-Identität
+#     "fastapi-backend" im Namespace "expat-tax" entspricht.
+#
+# Zusammen mit der NetworkPolicy in network-policies.yaml entsteht eine
+# Zwei-Schichten-Absicherung: L3/4 UND kryptografische Identität müssen
+# beide zutreffen, damit ein Request den erica-service erreicht.
+# -----------------------------------------------------------------------
+
+apiVersion: policy.linkerd.io/v1beta1
+kind: Server
+metadata:
+  name: erica-service-eric-port
+  namespace: expat-tax
+spec:
+  podSelector:
+    matchLabels:
+      app: erica-service
+  port: eric              # referenziert den benannten Container-Port "eric" (8443)
+  proxyProtocol: TLS       # erzwingt TLS-Handshake-Erwartung auf diesem Port
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: ServerAuthorization
+metadata:
+  name: erica-service-allow-only-fastapi-identity
+  namespace: expat-tax
+spec:
+  server:
+    name: erica-service-eric-port
+  client:
+    meshTLS:
+      # Format: <serviceaccount-name>.<namespace>.serviceaccount.identity.linkerd.cluster.local
+      # (Standard-Trust-Domain "cluster.local" - anpassen, falls die
+      # Linkerd-Installation eine andere Trust-Domain konfiguriert hat).
+      identities:
+        - "fastapi-backend.expat-tax.serviceaccount.identity.linkerd.cluster.local"

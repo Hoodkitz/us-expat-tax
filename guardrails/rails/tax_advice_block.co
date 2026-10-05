@@ -1,0 +1,62 @@
+# tax_advice_block.co
+# Input-Rail-Flow: blockt jede Anfrage, die auf Steuerberatung/-
+# optimierung abzielt, BEVOR das Haupt-LLM aufgerufen wird.
+#
+# HINWEIS ZUR LAUFZEIT-GARANTIE: Die tatsächliche Durchsetzung dieser
+# Regel im Backend erfolgt NICHT über NeMo's Embedding-basiertes
+# Canonical-Form-Matching (das würde ein Embedding-Modell + Netzwerk-
+# zugriff voraussetzen), sondern zusätzlich und primär über die
+# deterministische, regex-basierte Funktion
+# app.modules.chat_assistant.is_blocked_intent(), die vor jedem
+# LLM-Aufruf synchron im Python-Code läuft (siehe chat_assistant.py).
+# Diese .co-Datei ist die Colang-Spezifikation für den produktiven
+# NeMo-Guardrails-Runtime-Pfad, wenn ein echter Main-LLM + Embedding-
+# Provider verdrahtet ist.
+
+define user ask for tax advice
+  "Wie kann ich Steuern sparen?"
+  "Was soll ich als Werbungskosten absetzen?"
+  "Was kann ich absetzen?"
+  "Sollte ich FEIE oder FTC wählen?"
+  "Ist FTC oder FEIE besser?"
+  "Wie viel Steuern muss ich zahlen?"
+  "Was empfiehlst du mir steuerlich?"
+  "Wie optimiere ich meine Steuerlast?"
+  "Brauche ich Steuerberatung?"
+
+define bot refuse tax advice
+  "Diese App leistet keine Steuerberatung. Die finale rechtliche Verantwortung liegt beim Nutzer."
+
+define flow block tax advice requests
+  user ask for tax advice
+  bot refuse tax advice
+  stop
+
+define flow append disclaimer
+  bot respond
+  bot inform disclaimer
+
+define bot inform disclaimer
+  "Diese App leistet keine Steuerberatung. Die finale rechtliche Verantwortung liegt beim Nutzer."
+
+# ---------------------------------------------------------------------
+# ITERATION 6: Output-Rail. Läuft NACH der LLM-Generierung, BEVOR die
+# Antwort den Nutzer erreicht. Schließt die Lücke, die die Input-Rail
+# oben strukturell offen lässt (fiktive/rollenspielbasierte Umgehung).
+#
+# HINWEIS ZUR LAUFZEIT-GARANTIE (wie schon bei der Input-Rail in
+# Iteration 5): self_check_output benötigt einen echten Main-LLM-Call
+# und ist damit netzwerk-/API-abhängig. Die primär durchgesetzte
+# Variante läuft deterministisch und synchron im Python-Code
+# (app.modules.chat_assistant.output_rail_violated()) OHNE zusätzlichen
+# LLM-Call: Advisory-Sprach-Regex + Abgleich aller im Output
+# auftauchenden Zahlen gegen den injizierten Fakten-Kontext. Diese
+# .co-Definition ist die Spezifikation für den produktiven
+# NeMo-Runtime-Pfad, wenn zusätzlich ein Judge-LLM verdrahtet ist.
+# ---------------------------------------------------------------------
+
+define flow self check output
+  $allowed = execute self_check_output
+  if not $allowed
+    bot refuse tax advice
+    stop
