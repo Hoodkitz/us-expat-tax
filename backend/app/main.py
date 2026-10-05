@@ -3,15 +3,22 @@ FastAPI-Entrypoint. Verdrahtet Module 1-5. Bindet NUR an
 127.0.0.1 innerhalb des Containers - der Linkerd-Proxy-Sidecar
 übernimmt TLS-Termination und mTLS zu anderen Mesh-Teilnehmern
 (siehe docker-compose.yml).
+
+JWT Mandanten-Authentifizierung ist für alle /api/v1/ Routen aktiv.
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from app.auth.router import router as auth_router
+from app.auth.utils import get_current_tenant
 from app.modules.logic_engine import TaxpayerInput, evaluate as evaluate_tax
 from app.modules.compliance_state import compute_compliance_flags
 from app.modules.submission_saga import (
@@ -25,9 +32,28 @@ logger = logging.getLogger("app.main")
 app = FastAPI(
     title="US-Expat-Tax-App Backend",
     description="Interne API - nur via Linkerd-mTLS-Mesh erreichbar.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
+# ---------------------------------------------------------------------------
+# CORS (Lokale Frontend-Entwicklung auf localhost:3000)
+# ---------------------------------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---------------------------------------------------------------------------
+# Auth-Router einbinden
+# ---------------------------------------------------------------------------
+app.include_router(auth_router)
+
+# ---------------------------------------------------------------------------
+# Request-Modelle
+# ---------------------------------------------------------------------------
 
 class TaxEvaluationRequest(BaseModel):
     foreign_earned_income_usd: str = Field(..., examples=["90000"])
@@ -41,18 +67,44 @@ class TollgateRequest(BaseModel):
     totp_code: str
 
 
+# ---------------------------------------------------------------------------
+# Hilfsfunktion: Audit-Log pro Mandant
+# ---------------------------------------------------------------------------
+
+def _audit(tenant: dict, endpoint: str) -> None:
+    logger.info(
+        "AUDIT tenant_id=%s endpoint=%s timestamp=%s",
+        tenant["tenant_id"],
+        endpoint,
+        datetime.now(timezone.utc).isoformat(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Öffentliche Endpunkte
+# ---------------------------------------------------------------------------
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
 
 
+# ---------------------------------------------------------------------------
+# Geschützte Endpunkte (JWT-Pflicht)
+# ---------------------------------------------------------------------------
+
 @app.post("/api/v1/tax/evaluate")
-async def evaluate_tax_endpoint(payload: TaxEvaluationRequest) -> dict:
+async def evaluate_tax_endpoint(
+    payload: TaxEvaluationRequest,
+    current_tenant: Annotated[dict, Depends(get_current_tenant)],
+) -> dict:
     """
     Reiner Delegations-Endpunkt an die deterministische Steuer-Engine.
     Kein LLM beteiligt.
     """
     import sympy as sp
+
+    _audit(current_tenant, "/api/v1/tax/evaluate")
 
     try:
         inp = TaxpayerInput(
@@ -86,18 +138,26 @@ async def evaluate_tax_endpoint(payload: TaxEvaluationRequest) -> dict:
 
 
 @app.get("/api/v1/compliance/flags")
-async def compliance_flags_endpoint(max_account_balance_usd: str) -> dict:
+async def compliance_flags_endpoint(
+    max_account_balance_usd: str,
+    current_tenant: Annotated[dict, Depends(get_current_tenant)],
+) -> dict:
+    _audit(current_tenant, "/api/v1/compliance/flags")
     flags = compute_compliance_flags(max_account_balance_usd)
     return flags.__dict__
 
 
 @app.post("/api/v1/submission/tollgate")
-async def tollgate_endpoint(payload: TollgateRequest) -> dict:
+async def tollgate_endpoint(
+    payload: TollgateRequest,
+    current_tenant: Annotated[dict, Depends(get_current_tenant)],
+) -> dict:
     """
     Muss erfolgreich durchlaufen werden, BEVOR /submission/submit
     aufgerufen werden darf. Server-Secret kommt aus Vault, hier als
     Platzhalter-Injektion markiert.
     """
+    _audit(current_tenant, "/api/v1/submission/tollgate")
     server_secret = b"REPLACE_WITH_VAULT_INJECTED_SECRET"  # TODO: Vault-Anbindung
 
     try:
