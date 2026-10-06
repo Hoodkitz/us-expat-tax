@@ -125,6 +125,18 @@ export default function DashboardPage() {
             FBAR
           </Link>
           <Link
+            href="/fbar-penalties"
+            className="rounded-lg border border-brand-300 px-4 py-1.5 text-sm text-brand-700 hover:bg-brand-50 transition-colors"
+          >
+            FBAR Penalties
+          </Link>
+          <Link
+            href="/totalization"
+            className="rounded-lg border border-brand-300 px-4 py-1.5 text-sm text-brand-700 hover:bg-brand-50 transition-colors"
+          >
+            Totalization
+          </Link>
+          <Link
             href="/auth/logout"
             className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
           >
