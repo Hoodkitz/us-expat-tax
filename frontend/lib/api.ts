@@ -333,3 +333,105 @@ export async function apiEvaluate(
   });
   return handleResponse<TaxEvaluationResult>(res);
 }
+
+// -----------------------------------------------------------------------
+// State Tax Filing Obligations
+// -----------------------------------------------------------------------
+
+export interface StateTaxObligationsRequest {
+  state: string;
+  days_in_state: number;
+  domicile_state: string;
+  income_source: "employment" | "self_employment" | "investment" | "rental";
+  moved_abroad_year: number;
+  maintained_home: boolean;
+  driver_license_state?: string;
+  voter_reg_state?: string;
+}
+
+export interface StateTaxObligationsResult {
+  filing_required: boolean;
+  reason: string;
+  nexus_type: "domicile" | "statutory_resident" | "nonresident" | "none";
+  safe_harbor_days: number;
+  days_remaining_safe_harbor: number;
+  filing_deadline: string;
+  estimated_form: string;
+  recommendations: string[];
+  warning_flags: string[];
+}
+
+export interface StateTaxStateInfo {
+  code: string;
+  name: string;
+  has_income_tax: boolean;
+  safe_harbor_days: number;
+  statutory_resident_days: number;
+  notes: string;
+}
+
+export interface StateTaxStatesResult {
+  count: number;
+  states: StateTaxStateInfo[];
+  note: string;
+}
+
+export interface StateTaxDomicileRequest {
+  original_state: string;
+  years_abroad: number;
+  maintained_home: boolean;
+  voter_registered_in_state: boolean;
+  driver_license_in_state: boolean;
+  bank_accounts_in_state: boolean;
+  family_in_state: boolean;
+  returned_to_state_days_per_year: number;
+  intent_to_return: boolean;
+  business_ties_in_state: boolean;
+  vehicle_registered_in_state: boolean;
+}
+
+export interface StateTaxDomicileResult {
+  domicile_abandoned: boolean;
+  risk_score: number;
+  factors_for: string[];
+  factors_against: string[];
+  summary: string;
+}
+
+export async function apiStateTaxObligations(
+  payload: StateTaxObligationsRequest
+): Promise<StateTaxObligationsResult> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/state-tax/obligations`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<StateTaxObligationsResult>(res);
+}
+
+export async function apiStateTaxStates(): Promise<StateTaxStatesResult> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/state-tax/states`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return handleResponse<StateTaxStatesResult>(res);
+}
+
+export async function apiStateTaxDomicileAnalysis(
+  payload: StateTaxDomicileRequest
+): Promise<StateTaxDomicileResult> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/state-tax/domicile-analysis`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<StateTaxDomicileResult>(res);
+}
