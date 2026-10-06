@@ -32,6 +32,7 @@ from app.routers.form5471_router import router as form5471_router
 from app.routers.form8858_router import router as form8858_router
 from app.routers.form8621_router import router as form8621_router
 from app.routers.form8938_router import router as form8938_router
+from app.routers.form8865_router import router as form8865_router
 from app.modules.logic_engine import TaxpayerInput, evaluate as evaluate_tax
 from app.modules.compliance_state import compute_compliance_flags
 from app.modules.submission_saga import (
@@ -80,6 +81,7 @@ app.include_router(form5471_router, prefix="/api/v1/form5471")
 app.include_router(form8858_router, prefix="/api/v1/form8858")
 app.include_router(form8621_router, prefix="/api/v1/form8621")
 app.include_router(form8938_router, prefix="/api/v1/form8938")
+app.include_router(form8865_router, prefix="/api/v1/form8865")
 
 # ---------------------------------------------------------------------------
 # Request-Modelle
