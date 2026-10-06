@@ -526,3 +526,127 @@ export async function apiForm8938Overview(): Promise<Form8938Overview> {
   });
   return handleResponse<Form8938Overview>(res);
 }
+
+// -----------------------------------------------------------------------
+// Form 8865 Foreign Partnerships types & API
+// -----------------------------------------------------------------------
+
+export interface Partnership8865 {
+  name: string;
+  country: string;
+  ownership_percentage: number;
+  us_controlled: boolean;
+  fair_market_value_usd: number;
+  capital_contributed_usd?: number;
+  reportable_event?: boolean;
+}
+
+export interface FilingRequirement8865Request {
+  tax_year: number;
+  partnerships: Partnership8865[];
+}
+
+export interface FilingRequirement8865Result {
+  filing_required: boolean;
+  categories: string[];
+  total_partnerships: number;
+  reasons: string[];
+  penalty_if_not_filed: number;
+  recommendation: string;
+}
+
+export interface IncomeSummary8865Request {
+  tax_year: number;
+  partnership_name: string;
+  subpart_f_income_usd: number;
+  gilti_usd: number;
+  qbi_199a_usd: number;
+  ordinary_income_usd: number;
+  capital_gain_usd: number;
+  foreign_tax_paid_usd: number;
+}
+
+export interface IncomeSummary8865Result {
+  total_income_usd: number;
+  foreign_tax_credit_eligible: boolean;
+  notes: string[];
+}
+
+export interface PenaltyCalculation8865Request {
+  tax_year: number;
+  partnerships: Partnership8865[];
+  days_unreported: number;
+  is_willful: boolean;
+}
+
+export interface PenaltyResult8865 {
+  base_penalty: number;
+  continued_failure_penalty: number;
+  willful_penalty: number;
+  total_penalty: number;
+  explanation: string;
+}
+
+export interface Form8865Overview {
+  title: string;
+  category_1: string;
+  category_2: string;
+  category_3: string;
+  category_4: string;
+  category_5: string;
+  penalties: string;
+  filing_deadline: string;
+}
+
+export async function apiForm8865FilingRequirement(
+  payload: FilingRequirement8865Request
+): Promise<FilingRequirement8865Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8865/filing-requirement`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<FilingRequirement8865Result>(res);
+}
+
+export async function apiForm8865IncomeSummary(
+  payload: IncomeSummary8865Request
+): Promise<IncomeSummary8865Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8865/income-summary`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<IncomeSummary8865Result>(res);
+}
+
+export async function apiForm8865PenaltyCalculation(
+  payload: PenaltyCalculation8865Request
+): Promise<PenaltyResult8865> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8865/penalty-calculation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<PenaltyResult8865>(res);
+}
+
+export async function apiForm8865Overview(): Promise<Form8865Overview> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8865/overview`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return handleResponse<Form8865Overview>(res);
+}
