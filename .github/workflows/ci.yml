@@ -28,7 +28,8 @@ jobs:
             "passlib[bcrypt]>=1.7.4" \
             "bcrypt>=3.2.0,<4.0.0" \
             "python-jose[cryptography]>=3.3.0" \
-            "python-dotenv>=1.0.1"
+            "python-dotenv>=1.0.1" \
+            "reportlab>=4.2.0"
       - name: Run tests (skip heavy-dep test files)
         run: |
           cd backend && python -m pytest app/tests/ -x -q \
