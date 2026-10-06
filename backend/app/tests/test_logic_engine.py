@@ -450,3 +450,72 @@ def test_carryover_cannot_cross_subsidize_between_categories():
     # obwohl 50000 verfügbar wären.
     assert passive_result.carryover_used_this_year_usd == sp.Integer(8_000)
     assert passive_result.remaining_prior_carryovers_usd == sp.Integer(42_000)
+
+
+# ---------------------------------------------------------------------------
+# Neue Tests: FEIE 2024 Limit, FBAR-Schwelle, FTC Edge Cases
+# ---------------------------------------------------------------------------
+
+def test_feie_2024_limit_fully_excluded():
+    """
+    FEIE 2024: Einkommen exakt auf dem Jahresmaximum ($126.500) wird
+    vollständig ausgeschlossen – keine US-Steuerschuld.
+    """
+    inp = TaxpayerInput(
+        foreign_earned_income_usd=sp.Integer(126_500),
+        german_income_tax_paid_usd=sp.Integer(30_000),
+        us_tax_liability_before_credits_usd=sp.Integer(20_000),
+        num_qualifying_children=0,
+    )
+    result = compute_feie_path(inp)
+    # Exklusionsbetrag == Einkommen (kein Überschuss)
+    assert result.credit_or_exclusion_amount_usd == sp.Integer(126_500)
+    assert result.resulting_us_tax_liability_usd == sp.Integer(0)
+
+
+def test_feie_over_limit_excludes_cap_only():
+    """
+    FEIE über Limit: Bei $200.000 Einkommen werden genau $126.500
+    ausgeschlossen (die restlichen $73.500 bleiben steuerpflichtig).
+    """
+    inp = TaxpayerInput(
+        foreign_earned_income_usd=sp.Integer(200_000),
+        german_income_tax_paid_usd=sp.Integer(0),
+        us_tax_liability_before_credits_usd=sp.Integer(50_000),
+        num_qualifying_children=0,
+    )
+    result = compute_feie_path(inp)
+    assert result.credit_or_exclusion_amount_usd == sp.Integer(126_500)
+    # Nach FEIE bleibt anteilige US-Steuer für den nicht ausgeschlossenen Teil
+    assert result.resulting_us_tax_liability_usd > sp.Integer(0)
+
+
+def test_fbar_threshold_triggers_at_10000():
+    """
+    FBAR-Pflicht: Kontostand >= $10.000 (exakt 10.000 liegt UNTER dem
+    Schwellenwert, 10.001 liegt drüber).
+    """
+    # Exakt $10.000 -> kein FBAR (Schwellenwert ist >10.000)
+    flags_at = evaluate_reporting_thresholds(10_000)
+    assert flags_at["fbar_required"] is False
+
+    # $10.001 -> FBAR Pflicht
+    flags_over = evaluate_reporting_thresholds(10_001)
+    assert flags_over["fbar_required"] is True
+
+
+def test_ftc_zero_additional_tax_when_foreign_tax_covers_us_tax():
+    """
+    FTC: Wenn gezahlte ausländische Steuer >= US-Steuerschuld vor Credits,
+    ergibt sich $0 zusätzliche US-Steuer (Credit ist gedeckelt auf US-Steuer).
+    """
+    inp = TaxpayerInput(
+        foreign_earned_income_usd=sp.Integer(100_000),
+        german_income_tax_paid_usd=sp.Integer(30_000),  # > US-Steuer
+        us_tax_liability_before_credits_usd=sp.Integer(22_000),
+        num_qualifying_children=0,
+    )
+    result = compute_ftc_path(inp)
+    # Credit wird auf US-Steuer gedeckelt
+    assert result.credit_or_exclusion_amount_usd == sp.Integer(22_000)
+    assert result.resulting_us_tax_liability_usd == sp.Integer(0)
