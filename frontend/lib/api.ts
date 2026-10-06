@@ -99,6 +99,69 @@ export async function apiMe(): Promise<TenantOut> {
 }
 
 // -----------------------------------------------------------------------
+// FBAR types
+// -----------------------------------------------------------------------
+
+export interface FBAReporter {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  ssn_last4: string;
+}
+
+export interface ForeignAccount {
+  institution_name: string;
+  country: string;
+  account_number: string;
+  max_balance_usd: string;
+}
+
+export interface FBARReport {
+  reporter: FBAReporter;
+  year: number;
+  accounts: ForeignAccount[];
+}
+
+export async function apiFBARJson(report: FBARReport): Promise<any> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/fbar/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(report),
+  });
+  return handleResponse<any>(res);
+}
+
+export async function apiFBARPdf(report: FBARReport): Promise<Blob> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/fbar/generate/pdf`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(report),
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      detail = body.detail ?? JSON.stringify(body);
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
+  }
+  return res.blob();
+}
+
+// -----------------------------------------------------------------------
 // Tax Evaluation
 // -----------------------------------------------------------------------
 
