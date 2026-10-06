@@ -2,6 +2,7 @@
 
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { apiMe, apiEvaluate, TenantOut, TaxEvaluationResult } from "@/lib/api";
 
 // -----------------------------------------------------------------------
@@ -26,6 +27,14 @@ const FILING_LABELS: Record<string, string> = {
   HOH: "Head of Household (HOH)",
   QSS: "Qualifying Surviving Spouse (QSS)",
 };
+
+function strategyLabel(strategy: string): string {
+  if (strategy === "FEIE")
+    return "(Foreign Earned Income Exclusion - bis $126,500 steuerfrei)";
+  if (strategy === "FTC")
+    return "(Foreign Tax Credit - auslaendische Steuern werden angerechnet)";
+  return "";
+}
 
 // -----------------------------------------------------------------------
 // Main Dashboard
@@ -64,11 +73,6 @@ export default function DashboardPage() {
       });
   }, [router]);
 
-  function handleLogout() {
-    localStorage.removeItem("jwt_token");
-    router.push("/");
-  }
-
   async function handleEvaluate(e: FormEvent) {
     e.preventDefault();
     setEvalError(null);
@@ -91,10 +95,13 @@ export default function DashboardPage() {
 
   if (authError) return null;
 
+  const gitNum = parseFloat(git);
+  const showFbarBanner = !isNaN(gitNum) && gitNum >= 10000;
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      {/* Navbar – hidden when printing */}
+      <nav className="no-print bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <span className="font-extrabold text-brand-800 text-lg">
           🇺🇸 US Expat Tax
         </span>
@@ -105,19 +112,19 @@ export default function DashboardPage() {
               <span className="text-gray-400">({tenant.email})</span>
             </span>
           )}
-          <button
-            onClick={handleLogout}
+          <Link
+            href="/auth/logout"
             className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
           >
             Abmelden
-          </button>
+          </Link>
         </div>
       </nav>
 
       <main className="mx-auto max-w-4xl px-4 py-10 space-y-8">
         {/* Welcome */}
         {tenant && (
-          <div>
+          <div className="no-print">
             <h1 className="text-2xl font-bold text-gray-800">
               Willkommen, {tenant.tenant_name}!
             </h1>
@@ -128,8 +135,16 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Evaluation Form */}
-        <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+        {/* FBAR Banner */}
+        {showFbarBanner && (
+          <div className="no-print rounded-lg bg-yellow-50 border border-yellow-300 px-4 py-3 text-sm text-yellow-800">
+            ⚠️ <strong>FBAR-Pflicht pruefen:</strong> Auslaendische Konten ueber
+            $10.000 muessen auf FinCEN Form 114 gemeldet werden.
+          </div>
+        )}
+
+        {/* Evaluation Form – hidden when printing */}
+        <section className="no-print rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-800 mb-6">
             Steuerberechnung (FTC / FEIE)
           </h2>
@@ -275,53 +290,89 @@ export default function DashboardPage() {
 
         {/* Results */}
         {result && (
-          <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="text-2xl">
-                {result.recommended_path === "FTC" ? "🏆" : "✅"}
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  Empfehlung:{" "}
-                  <span className="text-brand-700">{result.recommended_path}</span>
-                </h2>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {result.recommendation_reason}
-                </p>
-              </div>
+          <div className="print-section">
+            {/* Print header – visible only when printing */}
+            <div className="hidden print:block mb-4 border-b border-gray-300 pb-3">
+              <p className="text-sm text-gray-600">
+                Mandant: <strong>{tenant?.email ?? "–"}</strong>
+              </p>
+              <p className="text-sm text-gray-600">
+                Datum:{" "}
+                <strong>{new Date().toLocaleDateString("de-DE")}</strong>
+              </p>
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              {/* FTC Result */}
-              <ResultCard
-                title="Foreign Tax Credit (FTC)"
-                badge={result.recommended_path === "FTC" ? "Empfohlen" : undefined}
-                rows={[
-                  { label: "Anrechenbarer Credit", value: fmtUSD(result.ftc.credit_usd) },
-                  { label: "Verbleibende US-Steuer", value: fmtUSD(result.ftc.resulting_tax_usd) },
-                  { label: "CTC freigeschaltet", value: result.ftc.ctc_unlocked ? "Ja ✓" : "Nein" },
-                  { label: "ACTC (erstattungsfähig)", value: fmtUSD(result.ftc.actc_refundable_usd) },
-                ]}
-              />
+            <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl">
+                    {result.recommended_path === "FTC" ? "🏆" : "✅"}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-800">
+                      Empfehlung:{" "}
+                      <span className="text-brand-700">
+                        {result.recommended_path}
+                      </span>
+                      {strategyLabel(result.recommended_path) && (
+                        <span className="ml-2 text-sm font-normal text-gray-500">
+                          {strategyLabel(result.recommended_path)}
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {result.recommendation_reason}
+                    </p>
+                  </div>
+                </div>
 
-              {/* FEIE Result */}
-              <ResultCard
-                title="FEIE (Ausschluss)"
-                badge={result.recommended_path === "FEIE" ? "Empfohlen" : undefined}
-                rows={[
-                  { label: "Ausgeschlossener Betrag", value: fmtUSD(result.feie.exclusion_usd) },
-                  { label: "Verbleibende US-Steuer", value: fmtUSD(result.feie.resulting_tax_usd) },
-                  { label: "CTC freigeschaltet", value: result.feie.ctc_unlocked ? "Ja ✓" : "Nein" },
-                  { label: "ACTC (erstattungsfähig)", value: fmtUSD(result.feie.actc_refundable_usd) },
-                ]}
-              />
-            </div>
+                {/* PDF Export button – no-print so it doesn't appear in the PDF itself */}
+                <button
+                  onClick={() => window.print()}
+                  className="no-print ml-4 shrink-0 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  📄 PDF exportieren
+                </button>
+              </div>
 
-            <p className="text-xs text-gray-400">
-              * Diese Berechnung ist eine automatisierte Orientierungshilfe
-              und ersetzt keine Steuerberatung.
-            </p>
-          </section>
+              <div className="grid gap-5 sm:grid-cols-2">
+                {/* FTC Result */}
+                <ResultCard
+                  title="Foreign Tax Credit (FTC)"
+                  badge={result.recommended_path === "FTC" ? "Empfohlen" : undefined}
+                  rows={[
+                    { label: "Anrechenbarer Credit", value: fmtUSD(result.ftc.credit_usd) },
+                    { label: "Verbleibende US-Steuer", value: fmtUSD(result.ftc.resulting_tax_usd) },
+                    { label: "CTC freigeschaltet", value: result.ftc.ctc_unlocked ? "Ja ✓" : "Nein" },
+                    { label: "ACTC (erstattungsfähig)", value: fmtUSD(result.ftc.actc_refundable_usd) },
+                  ]}
+                />
+
+                {/* FEIE Result */}
+                <ResultCard
+                  title="FEIE (Ausschluss)"
+                  badge={result.recommended_path === "FEIE" ? "Empfohlen" : undefined}
+                  rows={[
+                    { label: "Ausgeschlossener Betrag", value: fmtUSD(result.feie.exclusion_usd) },
+                    { label: "Verbleibende US-Steuer", value: fmtUSD(result.feie.resulting_tax_usd) },
+                    { label: "CTC freigeschaltet", value: result.feie.ctc_unlocked ? "Ja ✓" : "Nein" },
+                    { label: "ACTC (erstattungsfähig)", value: fmtUSD(result.feie.actc_refundable_usd) },
+                  ]}
+                />
+              </div>
+
+              {/* Disclaimer */}
+              <p className="text-xs italic text-gray-500">
+                Hinweis: Diese Berechnung ist eine Schaetzung. Bitte konsultiere
+                einen qualifizierten Steuerberater.
+              </p>
+
+              <p className="text-xs text-gray-400">
+                * Diese Berechnung ist eine automatisierte Orientierungshilfe
+                und ersetzt keine Steuerberatung.
+              </p>
+            </section>
+          </div>
         )}
       </main>
     </div>
