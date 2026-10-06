@@ -162,6 +162,94 @@ export async function apiFBARPdf(report: FBARReport): Promise<Blob> {
 }
 
 // -----------------------------------------------------------------------
+// Totalization Agreement types & API
+// -----------------------------------------------------------------------
+
+export interface TotalizationRequest {
+  country: string;
+  employment_type: "employee" | "self_employed";
+  years_in_us: number;
+  years_in_country: number;
+  us_citizen: boolean;
+}
+
+export interface TotalizationResult {
+  agreement_exists: boolean;
+  agreement_countries: string[];
+  applicable_system: string;
+  avoid_double_taxation: boolean;
+  fica_exempt: boolean;
+  explanation: string;
+}
+
+export async function apiTotalizationCheck(
+  payload: TotalizationRequest
+): Promise<TotalizationResult> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/totalization/check`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<TotalizationResult>(res);
+}
+
+export async function apiTotalizationCountries(): Promise<{
+  count: number;
+  countries: string[];
+}> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/totalization/countries`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return handleResponse<{ count: number; countries: string[] }>(res);
+}
+
+// -----------------------------------------------------------------------
+// FBAR Penalties types & API
+// -----------------------------------------------------------------------
+
+export interface FBARPenaltyRequest {
+  violation_type: "non_willful" | "willful" | "fraud";
+  years_of_violation: number;
+  max_account_balance: number;
+  filed_late: boolean;
+  voluntary_disclosure: boolean;
+}
+
+export interface PenaltyBreakdownItem {
+  description: string;
+  amount: number;
+}
+
+export interface FBARPenaltyResult {
+  min_penalty: number;
+  max_penalty: number;
+  criminal_risk: boolean;
+  streamlined_eligible: boolean;
+  penalty_breakdown: PenaltyBreakdownItem[];
+  recommendation: string;
+}
+
+export async function apiFBARPenalties(
+  payload: FBARPenaltyRequest
+): Promise<FBARPenaltyResult> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/fbar/penalties`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<FBARPenaltyResult>(res);
+}
+
+// -----------------------------------------------------------------------
 // FEIE (Form 2555) types
 // -----------------------------------------------------------------------
 
