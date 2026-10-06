@@ -28,6 +28,7 @@ from app.routers.state_tax_router import router as state_tax_router
 from app.routers.streamlined_router import router as streamlined_router
 from app.routers.form1116_router import router as form1116_router
 from app.routers.form3520_router import router as form3520_router
+from app.routers.form5471_router import router as form5471_router
 from app.modules.logic_engine import TaxpayerInput, evaluate as evaluate_tax
 from app.modules.compliance_state import compute_compliance_flags
 from app.modules.submission_saga import (
@@ -72,6 +73,7 @@ app.include_router(state_tax_router, prefix="/api/v1/state-tax")
 app.include_router(streamlined_router, prefix="/api/v1/streamlined")
 app.include_router(form1116_router, prefix="/api/v1/form1116")
 app.include_router(form3520_router, prefix="/api/v1/form3520")
+app.include_router(form5471_router, prefix="/api/v1/form5471")
 
 # ---------------------------------------------------------------------------
 # Request-Modelle
