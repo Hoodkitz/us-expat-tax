@@ -350,8 +350,10 @@ def test_income_summary_subpart_f_gilti():
 
     assert result.total_income_usd == 100_000.0
     assert result.foreign_tax_credit_eligible is True
-    assert "Subpart F income: $30,000.00" in result.notes[0]
-    assert "GILTI: $15,000.00" in result.notes[1]
+    # Notes order: FTC first, then Subpart F, then GILTI
+    assert any("Foreign taxes paid: $12,000.00" in note for note in result.notes)
+    assert any("Subpart F income: $30,000.00" in note for note in result.notes)
+    assert any("GILTI: $15,000.00" in note for note in result.notes)
 
 
 def test_income_summary_qbi_199a():
