@@ -84,4 +84,24 @@ See [`.env.example`](.env.example) for a full, annotated reference.
 | `GET` | `/health` | Liveness probe |
 | `POST` | `/api/v1/tax/evaluate` | FTC vs FEIE recommendation (deterministic) |
 | `GET` | `/api/v1/compliance/flags` | FBAR / FATCA compliance flags |
-| `POST` | `/api/v1/submission/tollgate` | 2FA gate; returns signed waiver token |
+|| `POST` | `/api/v1/submission/tollgate` | 2FA gate; returns signed waiver token |
+|| `POST` | `/api/v1/elster/test-connection` | ELSTER connection test (Mock) |
+|| `GET` | `/api/v1/elster/info` | ELSTER integration info |
+
+## ELSTER Integration
+
+**Status:** Mock-Implementierung vorbereitet. Benötigt echten ELSTER-Testzugang für Produktiv-Betrieb.
+
+Die ELSTER-Integration ist als Mock-Implementierung vorbereitet und stellt folgende Endpoints bereit:
+- `POST /api/v1/elster/test-connection` - Testet Verbindung mit Mock-Zertifikat-Status
+- `GET /api/v1/elster/info` - Zeigt verfügbare ELSTER-Endpoints und Requirements
+
+**Für Produktiv-Betrieb benötigt:**
+- ELSTER ERiC-Library Integration
+- Zertifikats-Authentifizierung (Softwarezertifikat)
+- Test-Zugang von ELSTER für Entwicklung
+- Produktiv-Zertifikat für Live-Betrieb
+
+**Dokumentation:** https://www.elster.de/elsterweb/entwickler
+
+**Frontend:** Test-Seite unter `/elster-test`
