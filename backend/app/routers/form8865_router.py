@@ -9,7 +9,10 @@ Endpoints:
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException
+from app.auth.utils import get_current_tenant
 from app.modules.form8865 import (
     FilingRequirementInput,
     FilingRequirementResult,
@@ -30,7 +33,10 @@ router = APIRouter(
 
 
 @router.post("/filing-requirement", response_model=FilingRequirementResult)
-def filing_requirement(inp: FilingRequirementInput) -> FilingRequirementResult:
+def filing_requirement(
+    inp: FilingRequirementInput,
+    current_tenant: Annotated[dict, Depends(get_current_tenant)],
+) -> FilingRequirementResult:
     """
     Check if the taxpayer has a filing requirement for Form 8865.
 
@@ -43,7 +49,10 @@ def filing_requirement(inp: FilingRequirementInput) -> FilingRequirementResult:
 
 
 @router.post("/income-summary", response_model=IncomeSummaryResult)
-def income_summary(inp: IncomeSummaryInput) -> IncomeSummaryResult:
+def income_summary(
+    inp: IncomeSummaryInput,
+    current_tenant: Annotated[dict, Depends(get_current_tenant)],
+) -> IncomeSummaryResult:
     """
     Summarize partnership income for tax reporting.
 
@@ -57,7 +66,10 @@ def income_summary(inp: IncomeSummaryInput) -> IncomeSummaryResult:
 
 
 @router.post("/penalty-calculation", response_model=PenaltyResult)
-def penalty_calculation(inp: PenaltyCalculationInput) -> PenaltyResult:
+def penalty_calculation(
+    inp: PenaltyCalculationInput,
+    current_tenant: Annotated[dict, Depends(get_current_tenant)],
+) -> PenaltyResult:
     """
     Calculate penalties for failure to file Form 8865.
 
