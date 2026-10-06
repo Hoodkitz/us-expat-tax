@@ -155,6 +155,12 @@ export default function DashboardPage() {
             Form 1116 (FTC)
           </Link>
           <Link
+            href="/form3520"
+            className="rounded-lg border border-brand-300 px-4 py-1.5 text-sm text-brand-700 hover:bg-brand-50 transition-colors"
+          >
+            Form 3520 (Foreign Gifts)
+          </Link>
+          <Link
             href="/auth/logout"
             className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
           >
