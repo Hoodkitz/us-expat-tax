@@ -33,6 +33,7 @@ from app.routers.form8858_router import router as form8858_router
 from app.routers.form8621_router import router as form8621_router
 from app.routers.form8938_router import router as form8938_router
 from app.routers.form8865_router import router as form8865_router
+from app.routers.form8854_router import router as form8854_router
 from app.routers.elster_router import router as elster_router
 from app.modules.logic_engine import TaxpayerInput, evaluate as evaluate_tax
 from app.modules.compliance_state import compute_compliance_flags
@@ -83,6 +84,7 @@ app.include_router(form8858_router, prefix="/api/v1/form8858")
 app.include_router(form8621_router, prefix="/api/v1/form8621")
 app.include_router(form8938_router, prefix="/api/v1/form8938")
 app.include_router(form8865_router, prefix="/api/v1/form8865")
+app.include_router(form8854_router)
 app.include_router(elster_router, prefix="/api/v1/elster")
 
 # ---------------------------------------------------------------------------
