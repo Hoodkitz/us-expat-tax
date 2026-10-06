@@ -464,7 +464,7 @@ function ElectionsTab() {
         ) : (
           <div>
             <p className="text-sm text-gray-600 mb-4">
-              QEF election: Include pro-rata share of PFIC's ordinary earnings
+              QEF election: Include pro-rata share of PFIC&apos;s ordinary earnings
               and net capital gain annually.
             </p>
             <form onSubmit={handleQefSubmit} className="space-y-4">
