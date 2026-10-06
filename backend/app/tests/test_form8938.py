@@ -302,11 +302,13 @@ class TestPenaltyCalculation:
         result = calculate_penalty(inp)
         assert result.base_penalty == PENALTY_FAILURE_TO_FILE
         assert result.continued_failure_penalty == 3 * PENALTY_CONTINUED_FAILURE_PER_30_DAYS
-        assert result.willful_penalty == 100_000.0 * PENALTY_WILLFUL_PERCENTAGE
+        # Willful penalty = greater of $100,000 or 50% of account value
+        expected_willful = max(100_000.0, 100_000.0 * PENALTY_WILLFUL_PERCENTAGE)
+        assert result.willful_penalty == expected_willful
         expected_total = (
             PENALTY_FAILURE_TO_FILE
             + 3 * PENALTY_CONTINUED_FAILURE_PER_30_DAYS
-            + 100_000.0 * PENALTY_WILLFUL_PERCENTAGE
+            + expected_willful
         )
         assert result.total_penalty == expected_total
 
