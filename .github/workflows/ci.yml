@@ -4,6 +4,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -34,3 +35,22 @@ jobs:
             --ignore=app/tests/test_chat_assistant.py
       - name: Type check (optional, non-blocking)
         run: pip install pyright && pyright backend/app/ || true
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Next.js build
+        run: npm run build
