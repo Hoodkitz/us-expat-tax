@@ -485,7 +485,7 @@ function SubpartFTab() {
           {result.high_tax_exception_may_apply && (
             <div style={{ background: "rgba(30,58,138,0.3)", border: "1px solid #1d4ed8", borderRadius: "0.5rem", padding: "1rem" }}>
               <p style={{ fontSize: "0.875rem", color: "#93c5fd" }}>
-                <strong>High-Tax Exception may apply</strong> — if the CFC's effective foreign tax
+                <strong>High-Tax Exception may apply</strong> — if the CFC&apos;s effective foreign tax
                 rate is ≥{result.effective_foreign_rate_threshold_pct}%, certain Subpart F income
                 may be excluded under Treas. Reg. §1.954-1(d).
               </p>
