@@ -25,7 +25,6 @@ from app.modules.form8865 import (
 )
 
 router = APIRouter(
-    prefix="/api/v1/form8865",
     tags=["form8865"],
 )
 
