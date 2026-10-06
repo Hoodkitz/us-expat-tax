@@ -435,3 +435,94 @@ export async function apiStateTaxDomicileAnalysis(
   });
   return handleResponse<StateTaxDomicileResult>(res);
 }
+
+// -----------------------------------------------------------------------
+// Form 8938 FATCA types & API
+// -----------------------------------------------------------------------
+
+export interface ForeignAccount8938 {
+  account_name: string;
+  account_type: string;
+  country: string;
+  max_value_usd: number;
+}
+
+export interface FilingRequirement8938Request {
+  filing_status: "single" | "mfj" | "mfs" | "hoh";
+  accounts: ForeignAccount8938[];
+  tax_year: number;
+}
+
+export interface FilingRequirement8938Result {
+  filing_required: boolean;
+  threshold_usd: number;
+  total_value_usd: number;
+  reasons: string[];
+  penalty_if_not_filed: number;
+  recommendation: string;
+}
+
+export interface PenaltyCalculation8938Request {
+  filing_status: "single" | "mfj" | "mfs" | "hoh";
+  accounts: ForeignAccount8938[];
+  tax_year: number;
+  days_unreported: number;
+  is_willful: boolean;
+}
+
+export interface PenaltyResult8938 {
+  base_penalty: number;
+  continued_failure_penalty: number;
+  willful_penalty: number;
+  total_penalty: number;
+  days_unreported: number;
+  is_willful: boolean;
+  explanation: string;
+}
+
+export interface Form8938Overview {
+  title: string;
+  filing_requirement: string;
+  thresholds: Record<string, number>;
+  penalties: Record<string, number>;
+  account_types: string[];
+  recommendation: string;
+}
+
+export async function apiForm8938FilingRequirement(
+  payload: FilingRequirement8938Request
+): Promise<FilingRequirement8938Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8938/filing-requirement`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<FilingRequirement8938Result>(res);
+}
+
+export async function apiForm8938PenaltyCalculator(
+  payload: PenaltyCalculation8938Request
+): Promise<PenaltyResult8938> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8938/penalty-calculator`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<PenaltyResult8938>(res);
+}
+
+export async function apiForm8938Overview(): Promise<Form8938Overview> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8938/overview`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return handleResponse<Form8938Overview>(res);
+}
