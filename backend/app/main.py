@@ -23,6 +23,7 @@ from app.routers.history_router import router as history_router
 from app.routers.fbar_router import router as fbar_router
 from app.routers.totalization_router import router as totalization_router
 from app.routers.fbar_penalties_router import router as fbar_penalties_router
+from app.routers.feie_router import router as feie_router
 from app.modules.logic_engine import TaxpayerInput, evaluate as evaluate_tax
 from app.modules.compliance_state import compute_compliance_flags
 from app.modules.submission_saga import (
@@ -62,6 +63,7 @@ app.include_router(history_router, prefix="/api/v1/history")
 app.include_router(fbar_router, prefix="/api/v1/fbar")
 app.include_router(totalization_router, prefix="/api/v1/totalization")
 app.include_router(fbar_penalties_router, prefix="/api/v1/fbar")
+app.include_router(feie_router, prefix="/api/v1/feie")
 
 # ---------------------------------------------------------------------------
 # Request-Modelle
