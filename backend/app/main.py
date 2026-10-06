@@ -31,6 +31,7 @@ from app.routers.form3520_router import router as form3520_router
 from app.routers.form5471_router import router as form5471_router
 from app.routers.form8858_router import router as form8858_router
 from app.routers.form8621_router import router as form8621_router
+from app.routers.form8833_router import router as form8833_router
 from app.routers.form8938_router import router as form8938_router
 from app.routers.form8865_router import router as form8865_router
 from app.routers.form8854_router import router as form8854_router
@@ -83,6 +84,7 @@ app.include_router(form3520_router, prefix="/api/v1/form3520")
 app.include_router(form5471_router, prefix="/api/v1/form5471")
 app.include_router(form8858_router, prefix="/api/v1/form8858")
 app.include_router(form8621_router, prefix="/api/v1/form8621")
+app.include_router(form8833_router, prefix="/api/v1/form8833")
 app.include_router(form8938_router, prefix="/api/v1/form8938")
 app.include_router(form8865_router, prefix="/api/v1/form8865")
 app.include_router(form8854_router)
