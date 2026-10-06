@@ -162,6 +162,72 @@ export async function apiFBARPdf(report: FBARReport): Promise<Blob> {
 }
 
 // -----------------------------------------------------------------------
+// FEIE (Form 2555) types
+// -----------------------------------------------------------------------
+
+export interface FEIECalculateRequest {
+  tax_year: number;
+  foreign_earned_income: number;
+  housing_costs: number;
+  days_in_foreign_country: number;
+  bona_fide_resident: boolean;
+  filing_status: "single" | "married_filing_jointly" | "married_filing_separately";
+  employer_provided_housing: number;
+}
+
+export interface FEIECalculateResult {
+  qualifies_pp: boolean;
+  qualifies_bfr: boolean;
+  qualifies: boolean;
+  feie_limit: number;
+  feie_exclusion: number;
+  housing_exclusion: number;
+  housing_base_amount: number;
+  total_exclusion: number;
+  taxable_income_estimate: number;
+  form_2555_required: boolean;
+  notes: string[];
+}
+
+export interface FEIEEligibilityRequest {
+  days_outside_us: number;
+  bona_fide_resident: boolean;
+  us_citizen_or_green_card: boolean;
+}
+
+export interface FEIEEligibilityResult {
+  eligible: boolean;
+  test_passed: "physical_presence" | "bona_fide_residence" | "none";
+  reason: string;
+}
+
+export async function apiFEIECalculate(
+  payload: FEIECalculateRequest
+): Promise<FEIECalculateResult> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/feie/calculate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<FEIECalculateResult>(res);
+}
+
+export async function apiFEIECheckEligibility(
+  payload: FEIEEligibilityRequest
+): Promise<FEIEEligibilityResult> {
+  const res = await fetch(`${API_BASE}/api/v1/feie/check-eligibility`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<FEIEEligibilityResult>(res);
+}
+
+// -----------------------------------------------------------------------
 // Tax Evaluation
 // -----------------------------------------------------------------------
 
