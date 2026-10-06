@@ -26,6 +26,7 @@ from app.routers.fbar_penalties_router import router as fbar_penalties_router
 from app.routers.feie_router import router as feie_router
 from app.routers.state_tax_router import router as state_tax_router
 from app.routers.streamlined_router import router as streamlined_router
+from app.routers.form1116_router import router as form1116_router
 from app.modules.logic_engine import TaxpayerInput, evaluate as evaluate_tax
 from app.modules.compliance_state import compute_compliance_flags
 from app.modules.submission_saga import (
@@ -68,6 +69,7 @@ app.include_router(fbar_penalties_router, prefix="/api/v1/fbar")
 app.include_router(feie_router, prefix="/api/v1/feie")
 app.include_router(state_tax_router, prefix="/api/v1/state-tax")
 app.include_router(streamlined_router, prefix="/api/v1/streamlined")
+app.include_router(form1116_router, prefix="/api/v1/form1116")
 
 # ---------------------------------------------------------------------------
 # Request-Modelle
