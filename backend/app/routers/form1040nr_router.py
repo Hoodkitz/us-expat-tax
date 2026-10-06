@@ -22,7 +22,7 @@ from app.modules.form1040nr import (
 
 logger = logging.getLogger("app.form1040nr")
 
-router = APIRouter(prefix="/form1040nr", tags=["form1040nr"])
+router = APIRouter(prefix="/api/v1/form1040nr", tags=["form1040nr"])
 
 
 @router.post(

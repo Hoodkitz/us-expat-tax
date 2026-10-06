@@ -86,7 +86,7 @@ app.include_router(form8621_router, prefix="/api/v1/form8621")
 app.include_router(form8938_router, prefix="/api/v1/form8938")
 app.include_router(form8865_router, prefix="/api/v1/form8865")
 app.include_router(form8854_router)
-app.include_router(form1040nr_router, prefix="/api/v1/form1040nr")
+app.include_router(form1040nr_router)
 app.include_router(elster_router, prefix="/api/v1/elster")
 
 # ---------------------------------------------------------------------------
