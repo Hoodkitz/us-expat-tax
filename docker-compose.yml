@@ -79,6 +79,21 @@ services:
     tmpfs:
       - /tmp:size=64m,noexec,nosuid
 
+  # -----------------------------------------------------------------
+  # Frontend: Next.js 14 Mandanten-Dashboard
+  # Nur für lokale Entwicklung / Compose – in Produktion über CDN.
+  # -----------------------------------------------------------------
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8000"
+    networks:
+      - edge
+
   # linkerd-proxy wird in Produktion via `linkerd inject` automatisch
   # als Sidecar in jeden Pod injiziert (K8s). Für die lokale Compose-
   # Entwicklung simulieren wir den mTLS-Boundary-Layer explizit:
