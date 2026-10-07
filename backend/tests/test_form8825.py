@@ -1,547 +1,500 @@
 """
-Tests for Form 8825 — Information Return by a U.S. Person with Respect to Certain Foreign Partnerships.
+Tests for Form 8825 – Rental Real Estate Income and Expenses.
 
-Tests cover:
-- Filing requirement determination (≥10%, ≥50%, General Partner)
-- Penalty calculation (base, continued failure, maximum)
-- Various entity types and edge cases
-- API endpoint tests
+Covers:
+- Filing requirement checks
+- Income summary calculations
+- Expense calculations
+- Passive activity loss limitations
+- API router endpoints
 """
 import pytest
 from fastapi.testclient import TestClient
-
 from app.main import app
 from app.modules.form8825 import (
     FilingRequirementInput,
-    PenaltyCalculationInput,
+    IncomeSummaryInput,
+    ExpenseCalculationInput,
     check_filing_requirement,
-    calculate_penalty,
+    calculate_income_summary,
+    calculate_expenses,
     get_overview,
-    PENALTY_PER_VIOLATION,
-    PENALTY_MAX_PER_YEAR,
-    OWNERSHIP_THRESHOLD,
-    CONTROL_THRESHOLD,
+    PASSIVE_LOSS_LIMIT,
+    PASSIVE_LOSS_PHASE_OUT_START,
+    PASSIVE_LOSS_PHASE_OUT_END,
 )
 
 client = TestClient(app)
 
 
-# ---------------------------------------------------------------------------
-# Helper: Get auth token
-# ---------------------------------------------------------------------------
+@pytest.fixture
+def override_auth_dependency():
+    """Override get_current_tenant for tests that need it."""
+    from app.auth.utils import get_current_tenant
+
+    async def mock_get_current_tenant():
+        return {
+            "tenant_id": "test-tenant-123",
+            "email": "test@example.com",
+            "tenant_name": "Test Tenant",
+        }
+
+    app.dependency_overrides[get_current_tenant] = mock_get_current_tenant
+    yield
+    app.dependency_overrides.clear()
 
 
-def _get_auth_token() -> str:
-    """Register a test user and return JWT token."""
-    # Register
-    client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": "test_form8825@example.com",
-            "tenant_name": "Test Tenant 8825",
-            "password": "testpassword123",
-        },
-    )
-    # Login
-    resp = client.post(
-        "/api/v1/auth/login",
-        json={
-            "email": "test_form8825@example.com",
-            "password": "testpassword123",
-        },
-    )
-    return resp.json()["access_token"]
+# ===========================================================================
+# Unit Tests – check_filing_requirement
+# ===========================================================================
 
+class TestCheckFilingRequirement:
+    """Tests for check_filing_requirement function."""
 
-def _auth_headers(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
-
-
-# ---------------------------------------------------------------------------
-# Module-level tests (direct function calls)
-# ---------------------------------------------------------------------------
-
-
-class TestFilingRequirementModule:
-    """Tests for the form8825 module filing requirement functions."""
-
-    def test_ownership_below_threshold_not_required(self):
-        """Ownership below 10% should not require filing."""
+    def test_no_rental_income_not_required(self):
+        """No rental income → filing not required."""
         inp = FilingRequirementInput(
             entity_type="individual",
-            ownership_percent=5.0,
-            us_owners=1,
-            foreign_corporation="no",
+            rental_income=0,
+            rental_expenses=0,
             tax_year=2024,
+            filing_status="single",
+            participation_level="active",
+            modified_agi=0,
         )
         result = check_filing_requirement(inp)
         assert result.filing_required is False
-        assert result.penalty_if_not_filed == 0.0
-        assert len(result.related_forms) == 0
+        assert result.net_rental_income == 0
+        assert len(result.reasons) > 0
 
-    def test_ownership_at_threshold_required(self):
-        """Ownership at exactly 10% should require filing."""
+    def test_rental_income_positive_required(self):
+        """Positive rental income → filing required."""
         inp = FilingRequirementInput(
             entity_type="individual",
-            ownership_percent=10.0,
-            us_owners=1,
-            foreign_corporation="no",
+            rental_income=12000,
+            rental_expenses=8000,
             tax_year=2024,
+            filing_status="single",
+            participation_level="active",
+            modified_agi=50000,
         )
         result = check_filing_requirement(inp)
         assert result.filing_required is True
-        assert result.penalty_if_not_filed == PENALTY_PER_VIOLATION
-        assert "Form 8865" in result.related_forms
+        assert result.net_rental_income == 4000
+        assert result.related_forms == ["Schedule E", "Form 4562"]
 
-    def test_ownership_above_threshold_required(self):
-        """Ownership above 10% should require filing."""
+    def test_rental_income_with_loss_active_participation(self):
+        """Rental loss with active participation → partial deduction."""
         inp = FilingRequirementInput(
             entity_type="individual",
-            ownership_percent=25.0,
-            us_owners=1,
-            foreign_corporation="no",
+            rental_income=10000,
+            rental_expenses=30000,
             tax_year=2024,
+            filing_status="single",
+            participation_level="active",
+            modified_agi=50000,
         )
         result = check_filing_requirement(inp)
         assert result.filing_required is True
-        assert result.penalty_if_not_filed == PENALTY_PER_VIOLATION
+        assert result.net_rental_income == -20000
+        # Loss is 20000, which is less than PASSIVE_LOSS_LIMIT (25000)
+        assert result.allowed_passive_loss == 20000
+        assert result.suspended_passive_loss == 0
 
-    def test_control_threshold_50_percent(self):
-        """Ownership at 50% should trigger control threshold."""
-        inp = FilingRequirementInput(
-            entity_type="corporation",
-            ownership_percent=50.0,
-            us_owners=1,
-            foreign_corporation="no",
-            tax_year=2024,
-        )
-        result = check_filing_requirement(inp)
-        assert result.filing_required is True
-        assert any("control" in r.lower() for r in result.reasons)
-
-    def test_ownership_above_50_percent(self):
-        """Ownership above 50% should trigger enhanced reporting."""
+    def test_rental_loss_passive_participation_suspended(self):
+        """Rental loss with passive participation → all suspended."""
         inp = FilingRequirementInput(
             entity_type="individual",
-            ownership_percent=75.0,
-            us_owners=1,
-            foreign_corporation="no",
+            rental_income=5000,
+            rental_expenses=20000,
             tax_year=2024,
+            filing_status="single",
+            participation_level="passive",
+            modified_agi=50000,
         )
         result = check_filing_requirement(inp)
         assert result.filing_required is True
-        assert any("enhanced" in r.lower() for r in result.reasons)
+        assert result.net_rental_income == -15000
+        assert result.allowed_passive_loss == 0
+        assert result.suspended_passive_loss == 15000
 
-    def test_multiple_us_owners(self):
-        """Multiple U.S. owners should trigger additional requirements."""
+    def test_real_estate_professional_full_deduction(self):
+        """Real estate professional → full loss deduction."""
+        inp = FilingRequirementInput(
+            entity_type="individual",
+            rental_income=5000,
+            rental_expenses=50000,
+            tax_year=2024,
+            filing_status="single",
+            participation_level="real_estate_professional",
+            modified_agi=200000,
+        )
+        result = check_filing_requirement(inp)
+        assert result.filing_required is True
+        assert result.net_rental_income == -45000
+        assert result.allowed_passive_loss == 45000
+        assert result.suspended_passive_loss == 0
+
+    def test_phase_out_midpoint(self):
+        """AGI at phase-out midpoint → reduced passive loss limit."""
+        mid_agi = (PASSIVE_LOSS_PHASE_OUT_START + PASSIVE_LOSS_PHASE_OUT_END) / 2
+        inp = FilingRequirementInput(
+            entity_type="individual",
+            rental_income=0,
+            rental_expenses=30000,
+            tax_year=2024,
+            filing_status="single",
+            participation_level="active",
+            modified_agi=mid_agi,
+        )
+        result = check_filing_requirement(inp)
+        expected_limit = PASSIVE_LOSS_LIMIT * 0.5
+        assert result.passive_loss_limit == pytest.approx(expected_limit, rel=1e-2)
+
+    def test_phase_out_complete(self):
+        """AGI above phase-out end → no passive loss deduction."""
+        inp = FilingRequirementInput(
+            entity_type="individual",
+            rental_income=0,
+            rental_expenses=30000,
+            tax_year=2024,
+            filing_status="single",
+            participation_level="active",
+            modified_agi=PASSIVE_LOSS_PHASE_OUT_END + 10000,
+        )
+        result = check_filing_requirement(inp)
+        assert result.passive_loss_limit == 0
+        assert result.allowed_passive_loss == 0
+        assert result.suspended_passive_loss == 30000
+
+    def test_partnership_entity_type(self):
+        """Partnership entity type works correctly."""
         inp = FilingRequirementInput(
             entity_type="partnership",
-            ownership_percent=15.0,
-            us_owners=3,
-            foreign_corporation="no",
+            rental_income=50000,
+            rental_expenses=30000,
             tax_year=2024,
+            filing_status="single",
+            participation_level="active",
+            modified_agi=50000,
         )
         result = check_filing_requirement(inp)
         assert result.filing_required is True
-        assert any("Multiple U.S. owners" in r for r in result.reasons)
+        assert result.entity_type == "partnership"
+        assert result.net_rental_income == 20000
 
-    def test_foreign_corporation_flag(self):
-        """Foreign corporation flag should add Form 5471 reference."""
-        inp = FilingRequirementInput(
-            entity_type="individual",
-            ownership_percent=20.0,
-            us_owners=1,
-            foreign_corporation="yes",
+
+# ===========================================================================
+# Unit Tests – calculate_income_summary
+# ===========================================================================
+
+class TestCalculateIncomeSummary:
+    """Tests for calculate_income_summary function."""
+
+    def test_basic_income(self):
+        """Basic rental income calculation."""
+        inp = IncomeSummaryInput(
+            rents_received=12000,
+            advance_rents=0,
+            security_deposits_retained=0,
+            rental_expenses_paid_by_tenant=0,
             tax_year=2024,
         )
-        result = check_filing_requirement(inp)
-        assert result.filing_required is True
-        assert "Form 5471" in result.related_forms
-        assert any("foreign corporation" in r.lower() for r in result.reasons)
+        result = calculate_income_summary(inp)
+        assert result.gross_rental_income == 12000
+        assert result.total_rental_income == 12000
 
-    def test_entity_type_llc(self):
-        """LLC entity type should work correctly."""
-        inp = FilingRequirementInput(
-            entity_type="llc",
-            ownership_percent=30.0,
-            us_owners=1,
-            foreign_corporation="no",
+    def test_income_with_advance_rents(self):
+        """Income including advance rents."""
+        inp = IncomeSummaryInput(
+            rents_received=12000,
+            advance_rents=2000,
+            security_deposits_retained=0,
+            rental_expenses_paid_by_tenant=0,
             tax_year=2024,
         )
-        result = check_filing_requirement(inp)
-        assert result.filing_required is True
-        assert result.entity_type == "llc"
+        result = calculate_income_summary(inp)
+        assert result.total_rental_income == 14000
+        assert result.advance_rents == 2000
 
-    def test_entity_type_trust(self):
-        """Trust entity type should work correctly."""
-        inp = FilingRequirementInput(
-            entity_type="trust",
-            ownership_percent=12.0,
-            us_owners=1,
-            foreign_corporation="no",
+    def test_income_with_security_deposits(self):
+        """Income including retained security deposits."""
+        inp = IncomeSummaryInput(
+            rents_received=12000,
+            advance_rents=0,
+            security_deposits_retained=1500,
+            rental_expenses_paid_by_tenant=0,
             tax_year=2024,
         )
-        result = check_filing_requirement(inp)
-        assert result.filing_required is True
-        assert result.entity_type == "trust"
+        result = calculate_income_summary(inp)
+        assert result.total_rental_income == 13500
+        assert result.security_deposits_retained == 1500
 
-    def test_zero_ownership_not_required(self):
-        """Zero ownership should not require filing."""
-        inp = FilingRequirementInput(
-            entity_type="individual",
-            ownership_percent=0.0,
-            us_owners=0,
-            foreign_corporation="no",
+    def test_income_with_tenant_paid_expenses(self):
+        """Income including tenant-paid expenses."""
+        inp = IncomeSummaryInput(
+            rents_received=12000,
+            advance_rents=0,
+            security_deposits_retained=0,
+            rental_expenses_paid_by_tenant=800,
             tax_year=2024,
         )
-        result = check_filing_requirement(inp)
-        assert result.filing_required is False
-        assert result.penalty_if_not_filed == 0.0
+        result = calculate_income_summary(inp)
+        assert result.total_rental_income == 12800
+        assert result.tenant_paid_expenses == 800
 
-    def test_100_percent_ownership(self):
-        """100% ownership should require filing with control threshold."""
-        inp = FilingRequirementInput(
-            entity_type="corporation",
-            ownership_percent=100.0,
-            us_owners=1,
-            foreign_corporation="no",
+    def test_all_income_sources(self):
+        """All income sources combined."""
+        inp = IncomeSummaryInput(
+            rents_received=24000,
+            advance_rents=3000,
+            security_deposits_retained=1000,
+            rental_expenses_paid_by_tenant=500,
             tax_year=2024,
         )
-        result = check_filing_requirement(inp)
-        assert result.filing_required is True
-        assert any("control" in r.lower() for r in result.reasons)
+        result = calculate_income_summary(inp)
+        assert result.total_rental_income == 28500
+        assert "28,500" in result.explanation
 
 
-class TestPenaltyCalculationModule:
-    """Tests for the form8825 module penalty calculation functions."""
+# ===========================================================================
+# Unit Tests – calculate_expenses
+# ===========================================================================
 
-    def test_no_penalty_when_not_required(self):
-        """No penalty when filing is not required."""
-        inp = PenaltyCalculationInput(
-            entity_type="individual",
-            ownership_percent=5.0,
-            us_owners=1,
-            foreign_corporation="no",
+class TestCalculateExpenses:
+    """Tests for calculate_expenses function."""
+
+    def test_basic_expenses(self):
+        """Basic expense calculation."""
+        inp = ExpenseCalculationInput(
+            advertising=500,
+            auto_travel=0,
+            cleaning_maintenance=1200,
+            commissions=0,
+            insurance=1800,
+            legal_professional_fees=0,
+            management_fees=0,
+            mortgage_interest=8000,
+            repairs=2000,
+            supplies=300,
+            taxes=2500,
+            utilities=1500,
+            depreciation=5000,
+            other_expenses=0,
             tax_year=2024,
-            is_general_partner=False,
-            violations_count=1,
-            days_unreported=0,
         )
-        result = calculate_penalty(inp)
-        assert result.total_penalty == 0.0
-        assert result.base_penalty == 0.0
+        result = calculate_expenses(inp)
+        assert result.total_expenses == 22800
+        assert result.deductible_expenses == 22800
+        assert result.non_deductible_expenses == 0
 
-    def test_base_penalty_single_violation(self):
-        """Base penalty for single violation should be $10,000."""
-        inp = PenaltyCalculationInput(
-            entity_type="individual",
-            ownership_percent=15.0,
-            us_owners=1,
-            foreign_corporation="no",
+    def test_zero_expenses(self):
+        """All zero expenses."""
+        inp = ExpenseCalculationInput(
+            advertising=0,
+            auto_travel=0,
+            cleaning_maintenance=0,
+            commissions=0,
+            insurance=0,
+            legal_professional_fees=0,
+            management_fees=0,
+            mortgage_interest=0,
+            repairs=0,
+            supplies=0,
+            taxes=0,
+            utilities=0,
+            depreciation=0,
+            other_expenses=0,
             tax_year=2024,
-            is_general_partner=False,
-            violations_count=1,
-            days_unreported=0,
         )
-        result = calculate_penalty(inp)
-        assert result.base_penalty == PENALTY_PER_VIOLATION
-        assert result.total_penalty == PENALTY_PER_VIOLATION
+        result = calculate_expenses(inp)
+        assert result.total_expenses == 0
+        assert result.deductible_expenses == 0
 
-    def test_base_penalty_multiple_violations(self):
-        """Base penalty for multiple violations should multiply."""
-        inp = PenaltyCalculationInput(
-            entity_type="individual",
-            ownership_percent=15.0,
-            us_owners=1,
-            foreign_corporation="no",
+    def test_expense_breakdown(self):
+        """Expense breakdown contains all categories."""
+        inp = ExpenseCalculationInput(
+            advertising=100,
+            auto_travel=200,
+            cleaning_maintenance=300,
+            commissions=400,
+            insurance=500,
+            legal_professional_fees=600,
+            management_fees=700,
+            mortgage_interest=800,
+            repairs=900,
+            supplies=1000,
+            taxes=1100,
+            utilities=1200,
+            depreciation=1300,
+            other_expenses=1400,
             tax_year=2024,
-            is_general_partner=False,
-            violations_count=3,
-            days_unreported=0,
         )
-        result = calculate_penalty(inp)
-        assert result.base_penalty == PENALTY_PER_VIOLATION * 3
-        assert result.total_penalty == PENALTY_PER_VIOLATION * 3
-
-    def test_penalty_capped_at_maximum(self):
-        """Penalty should be capped at $50,000 per year."""
-        inp = PenaltyCalculationInput(
-            entity_type="individual",
-            ownership_percent=15.0,
-            us_owners=1,
-            foreign_corporation="no",
-            tax_year=2024,
-            is_general_partner=False,
-            violations_count=10,
-            days_unreported=0,
-        )
-        result = calculate_penalty(inp)
-        assert result.base_penalty == PENALTY_MAX_PER_YEAR
-        assert result.total_penalty == PENALTY_MAX_PER_YEAR
-
-    def test_continued_failure_penalty(self):
-        """Continued failure after IRS notice should add penalty."""
-        inp = PenaltyCalculationInput(
-            entity_type="individual",
-            ownership_percent=15.0,
-            us_owners=1,
-            foreign_corporation="no",
-            tax_year=2024,
-            is_general_partner=False,
-            violations_count=1,
-            days_unreported=60,
-        )
-        result = calculate_penalty(inp)
-        assert result.base_penalty == PENALTY_PER_VIOLATION
-        assert result.continued_failure_penalty == PENALTY_PER_VIOLATION * 2
-        assert result.total_penalty == PENALTY_PER_VIOLATION * 2
-
-    def test_general_partner_penalty(self):
-        """General Partner status should trigger penalty even below threshold."""
-        inp = PenaltyCalculationInput(
-            entity_type="individual",
-            ownership_percent=5.0,
-            us_owners=1,
-            foreign_corporation="no",
-            tax_year=2024,
-            is_general_partner=True,
-            violations_count=1,
-            days_unreported=0,
-        )
-        result = calculate_penalty(inp)
-        assert result.base_penalty == PENALTY_PER_VIOLATION
-        assert result.is_general_partner is True
-
-    def test_continued_failure_capped(self):
-        """Continued failure penalty should not exceed maximum."""
-        inp = PenaltyCalculationInput(
-            entity_type="individual",
-            ownership_percent=15.0,
-            us_owners=1,
-            foreign_corporation="no",
-            tax_year=2024,
-            is_general_partner=False,
-            violations_count=1,
-            days_unreported=365,
-        )
-        result = calculate_penalty(inp)
-        assert result.total_penalty <= PENALTY_MAX_PER_YEAR
+        result = calculate_expenses(inp)
+        assert len(result.expense_breakdown) == 14
+        assert result.expense_breakdown["advertising"] == 100
+        assert result.expense_breakdown["depreciation"] == 1300
+        assert result.total_expenses == 10500
 
 
-class TestOverviewModule:
-    """Tests for the form8825 overview function."""
+# ===========================================================================
+# Unit Tests – get_overview
+# ===========================================================================
 
-    def test_overview_returns_required_fields(self):
-        """Overview should return all required fields."""
+class TestGetOverview:
+    """Tests for get_overview function."""
+
+    def test_overview_structure(self):
+        """Overview has all required fields."""
         result = get_overview()
-        assert result.title != ""
-        assert result.description != ""
+        assert result.title == "Form 8825: Rental Real Estate Income and Expenses"
         assert len(result.who_must_file) > 0
-        assert "penalties" in result.penalties.lower() or "$" in result.penalties
+        assert len(result.income_types) > 0
+        assert len(result.expense_categories) > 0
+        assert "active participants" in result.passive_loss_rules.lower()
         assert len(result.related_forms) > 0
-        assert "Form 8865" in result.related_forms[0]
+        assert len(result.recommendation) > 0
 
-    def test_overview_contains_thresholds(self):
-        """Overview should mention ownership thresholds."""
+    def test_overview_expense_categories(self):
+        """Overview includes all expense categories."""
         result = get_overview()
-        assert "10%" in result.ownership_threshold
-        assert "50%" in result.control_threshold
+        expected_categories = [
+            "advertising", "auto_travel", "cleaning_maintenance", "commissions",
+            "insurance", "legal_professional_fees", "management_fees",
+            "mortgage_interest", "repairs", "supplies", "taxes", "utilities",
+            "depreciation", "other",
+        ]
+        for cat in expected_categories:
+            assert cat in result.expense_categories
 
 
-# ---------------------------------------------------------------------------
-# API endpoint tests
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# API Router Tests
+# ===========================================================================
 
+class TestForm8825Router:
+    """Tests for Form 8825 API router endpoints."""
 
-class TestForm8825API:
-    """Tests for the Form 8825 API endpoints."""
-
-    @pytest.fixture(autouse=True)
-    def setup_auth(self):
-        """Get auth token for each test."""
-        self.token = _get_auth_token()
-        self.headers = _auth_headers(self.token)
-
-    def test_filing_requirement_endpoint_required(self):
-        """Test filing-requirement endpoint with required filing."""
-        resp = client.post(
+    def test_filing_requirement_endpoint(self, override_auth_dependency):
+        """POST /filing-requirement returns correct result."""
+        response = client.post(
             "/api/v1/form8825/filing-requirement",
-            headers=self.headers,
             json={
                 "entity_type": "individual",
-                "ownership_percent": 25.0,
-                "us_owners": 1,
-                "foreign_corporation": "no",
+                "rental_income": 15000,
+                "rental_expenses": 10000,
                 "tax_year": 2024,
+                "filing_status": "single",
+                "participation_level": "active",
+                "modified_agi": 60000,
             },
         )
-        assert resp.status_code == 200
-        data = resp.json()
+        assert response.status_code == 200
+        data = response.json()
         assert data["filing_required"] is True
-        assert data["penalty_if_not_filed"] == PENALTY_PER_VIOLATION
-        assert "Form 8865" in data["related_forms"]
+        assert data["net_rental_income"] == 5000
+        assert "reasons" in data
 
-    def test_filing_requirement_endpoint_not_required(self):
-        """Test filing-requirement endpoint with no filing required."""
-        resp = client.post(
-            "/api/v1/form8825/filing-requirement",
-            headers=self.headers,
+    def test_income_summary_endpoint(self, override_auth_dependency):
+        """POST /income-summary returns correct result."""
+        response = client.post(
+            "/api/v1/form8825/income-summary",
             json={
-                "entity_type": "individual",
-                "ownership_percent": 5.0,
-                "us_owners": 1,
-                "foreign_corporation": "no",
+                "rents_received": 18000,
+                "advance_rents": 1000,
+                "security_deposits_retained": 500,
+                "rental_expenses_paid_by_tenant": 300,
                 "tax_year": 2024,
             },
         )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["filing_required"] is False
-        assert data["penalty_if_not_filed"] == 0.0
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_rental_income"] == 19800
+        assert data["gross_rental_income"] == 18000
 
-    def test_filing_requirement_requires_auth(self):
-        """Test filing-requirement endpoint requires authentication."""
-        resp = client.post(
-            "/api/v1/form8825/filing-requirement",
+    def test_expense_calculation_endpoint(self, override_auth_dependency):
+        """POST /expense-calculation returns correct result."""
+        response = client.post(
+            "/api/v1/form8825/expense-calculation",
             json={
-                "entity_type": "individual",
-                "ownership_percent": 25.0,
-                "us_owners": 1,
-                "foreign_corporation": "no",
+                "advertising": 600,
+                "auto_travel": 0,
+                "cleaning_maintenance": 1500,
+                "commissions": 0,
+                "insurance": 2000,
+                "legal_professional_fees": 500,
+                "management_fees": 0,
+                "mortgage_interest": 9000,
+                "repairs": 2500,
+                "supplies": 400,
+                "taxes": 3000,
+                "utilities": 1800,
+                "depreciation": 6000,
+                "other_expenses": 0,
                 "tax_year": 2024,
             },
         )
-        assert resp.status_code == 401
-
-    def test_filing_requirement_invalid_ownership(self):
-        """Test filing-requirement endpoint with invalid ownership."""
-        resp = client.post(
-            "/api/v1/form8825/filing-requirement",
-            headers=self.headers,
-            json={
-                "entity_type": "individual",
-                "ownership_percent": 150.0,
-                "us_owners": 1,
-                "foreign_corporation": "no",
-                "tax_year": 2024,
-            },
-        )
-        assert resp.status_code == 422
-
-    def test_filing_requirement_invalid_entity_type(self):
-        """Test filing-requirement endpoint with invalid entity type."""
-        resp = client.post(
-            "/api/v1/form8825/filing-requirement",
-            headers=self.headers,
-            json={
-                "entity_type": "invalid",
-                "ownership_percent": 25.0,
-                "us_owners": 1,
-                "foreign_corporation": "no",
-                "tax_year": 2024,
-            },
-        )
-        assert resp.status_code == 422
-
-    def test_penalty_calculation_endpoint(self):
-        """Test penalty-calculation endpoint."""
-        resp = client.post(
-            "/api/v1/form8825/penalty-calculation",
-            headers=self.headers,
-            json={
-                "entity_type": "individual",
-                "ownership_percent": 25.0,
-                "us_owners": 1,
-                "foreign_corporation": "no",
-                "tax_year": 2024,
-                "is_general_partner": False,
-                "violations_count": 2,
-                "days_unreported": 30,
-            },
-        )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["base_penalty"] == PENALTY_PER_VIOLATION * 2
-        assert data["total_penalty"] > 0
-
-    def test_penalty_calculation_requires_auth(self):
-        """Test penalty-calculation endpoint requires authentication."""
-        resp = client.post(
-            "/api/v1/form8825/penalty-calculation",
-            json={
-                "entity_type": "individual",
-                "ownership_percent": 25.0,
-                "us_owners": 1,
-                "foreign_corporation": "no",
-                "tax_year": 2024,
-                "is_general_partner": False,
-                "violations_count": 1,
-                "days_unreported": 0,
-            },
-        )
-        assert resp.status_code == 401
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_expenses"] == 27300
+        assert data["deductible_expenses"] == 27300
+        assert "expense_breakdown" in data
 
     def test_overview_endpoint(self):
-        """Test overview endpoint."""
-        resp = client.get("/api/v1/form8825/overview")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "Form 8825" in data["title"]
-        assert "penalties" in data
-        assert "related_forms" in data
+        """GET /overview returns overview data."""
+        response = client.get("/api/v1/form8825/overview")
+        assert response.status_code == 200
+        data = response.json()
+        assert "title" in data
+        assert "who_must_file" in data
+        assert "expense_categories" in data
 
-    def test_overview_endpoint_requires_auth(self):
-        """Test overview endpoint requires authentication."""
-        # Note: overview endpoint may or may not require auth depending on implementation
-        # Based on the router definition, it does NOT have get_current_tenant dependency
-        # So it should be accessible without auth
-        resp = client.get("/api/v1/form8825/overview")
-        assert resp.status_code == 200
-
-    def test_filing_requirement_negative_ownership(self):
-        """Test filing-requirement endpoint with negative ownership."""
-        resp = client.post(
+    def test_filing_requirement_invalid_entity_type(self, override_auth_dependency):
+        """Invalid entity type returns 422."""
+        response = client.post(
             "/api/v1/form8825/filing-requirement",
-            headers=self.headers,
             json={
-                "entity_type": "individual",
-                "ownership_percent": -5.0,
-                "us_owners": 1,
-                "foreign_corporation": "no",
+                "entity_type": "invalid_type",
+                "rental_income": 10000,
+                "rental_expenses": 5000,
                 "tax_year": 2024,
             },
         )
-        assert resp.status_code == 422
+        assert response.status_code == 422
 
-    def test_filing_requirement_invalid_tax_year(self):
-        """Test filing-requirement endpoint with invalid tax year."""
-        resp = client.post(
+    def test_filing_requirement_negative_income(self, override_auth_dependency):
+        """Negative rental income returns 422."""
+        response = client.post(
             "/api/v1/form8825/filing-requirement",
-            headers=self.headers,
             json={
                 "entity_type": "individual",
-                "ownership_percent": 25.0,
-                "us_owners": 1,
-                "foreign_corporation": "no",
-                "tax_year": 1800,
-            },
-        )
-        assert resp.status_code == 422
-
-    def test_penalty_calculation_invalid_violations(self):
-        """Test penalty-calculation endpoint with invalid violations count."""
-        resp = client.post(
-            "/api/v1/form8825/penalty-calculation",
-            headers=self.headers,
-            json={
-                "entity_type": "individual",
-                "ownership_percent": 25.0,
-                "us_owners": 1,
-                "foreign_corporation": "no",
+                "rental_income": -1000,
+                "rental_expenses": 5000,
                 "tax_year": 2024,
-                "is_general_partner": False,
-                "violations_count": 0,
-                "days_unreported": 0,
             },
         )
-        assert resp.status_code == 422
+        assert response.status_code == 422
+
+    def test_income_summary_missing_required_field(self, override_auth_dependency):
+        """Missing required field returns 422."""
+        response = client.post(
+            "/api/v1/form8825/income-summary",
+            json={
+                "rents_received": 10000,
+                # missing tax_year
+            },
+        )
+        assert response.status_code == 422
+
+    def test_expense_calculation_defaults(self, override_auth_dependency):
+        """Expense calculation with defaults (all zeros)."""
+        response = client.post(
+            "/api/v1/form8825/expense-calculation",
+            json={
+                "tax_year": 2024,
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_expenses"] == 0
+        assert data["deductible_expenses"] == 0

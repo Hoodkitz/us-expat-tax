@@ -3,7 +3,8 @@ Form 8825 API Router.
 
 Endpoints:
 - POST /api/v1/form8825/filing-requirement — Check if Form 8825 filing is required
-- POST /api/v1/form8825/penalty-calculation — Calculate penalties for non-filing
+- POST /api/v1/form8825/income-summary — Calculate rental income summary
+- POST /api/v1/form8825/expense-calculation — Calculate rental expenses
 - GET  /api/v1/form8825/overview — Get overview of Form 8825 requirements
 """
 from __future__ import annotations
@@ -15,11 +16,14 @@ from app.auth.utils import get_current_tenant
 from app.modules.form8825 import (
     FilingRequirementInput,
     FilingRequirementResult,
-    PenaltyCalculationInput,
-    PenaltyResult,
+    IncomeSummaryInput,
+    IncomeSummaryResult,
+    ExpenseCalculationInput,
+    ExpenseCalculationResult,
     Form8825Overview,
     check_filing_requirement,
-    calculate_penalty,
+    calculate_income_summary,
+    calculate_expenses,
     get_overview,
 )
 
@@ -36,7 +40,7 @@ def filing_requirement(
     """
     Check if the taxpayer has a filing requirement for Form 8825.
 
-    Returns filing requirement status, reasons, and recommendations.
+    Returns filing requirement status, passive loss calculations, and recommendations.
     """
     try:
         return check_filing_requirement(inp)
@@ -44,18 +48,35 @@ def filing_requirement(
         raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")
 
 
-@router.post("/penalty-calculation", response_model=PenaltyResult)
-def penalty_calculation(
-    inp: PenaltyCalculationInput,
+@router.post("/income-summary", response_model=IncomeSummaryResult)
+def income_summary(
+    inp: IncomeSummaryInput,
     current_tenant: Annotated[dict, Depends(get_current_tenant)],
-) -> PenaltyResult:
+) -> IncomeSummaryResult:
     """
-    Calculate penalties for failure to file Form 8825.
+    Calculate rental income summary for Form 8825.
 
-    Returns base penalty, continued failure penalty, and total.
+    Returns total rental income including advance rents, security deposits,
+    and tenant-paid expenses.
     """
     try:
-        return calculate_penalty(inp)
+        return calculate_income_summary(inp)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")
+
+
+@router.post("/expense-calculation", response_model=ExpenseCalculationResult)
+def expense_calculation(
+    inp: ExpenseCalculationInput,
+    current_tenant: Annotated[dict, Depends(get_current_tenant)],
+) -> ExpenseCalculationResult:
+    """
+    Calculate rental expenses for Form 8825.
+
+    Returns total expenses, breakdown by category, and deductible amounts.
+    """
+    try:
+        return calculate_expenses(inp)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")
 
@@ -65,6 +86,7 @@ def overview() -> Form8825Overview:
     """
     Get overview of Form 8825 requirements.
 
-    Returns information about filing thresholds, penalties, and related forms.
+    Returns information about filing thresholds, income types, expense categories,
+    and passive loss rules.
     """
     return get_overview()

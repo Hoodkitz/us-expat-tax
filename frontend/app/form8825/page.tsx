@@ -6,11 +6,13 @@ import Link from "next/link";
 import {
   apiMe,
   apiForm8825FilingRequirement,
-  apiForm8825PenaltyCalculation,
+  apiForm8825IncomeSummary,
+  apiForm8825ExpenseCalculation,
   apiForm8825Overview,
   TenantOut,
   FilingRequirement8825Result,
-  PenaltyResult8825,
+  IncomeSummary8825Result,
+  ExpenseCalculation8825Result,
   Form8825Overview,
 } from "@/lib/api";
 
@@ -18,7 +20,7 @@ import {
 // Types
 // -----------------------------------------------------------------------
 
-type ActiveTab = "filing" | "penalties" | "overview";
+type ActiveTab = "filing" | "income-expenses" | "overview";
 
 // -----------------------------------------------------------------------
 // Helpers
@@ -45,22 +47,37 @@ export default function Form8825Page() {
 
   // Filing Requirement State
   const [entityType, setEntityType] = useState("individual");
-  const [ownershipPercent, setOwnershipPercent] = useState(0);
-  const [usOwners, setUsOwners] = useState(1);
-  const [foreignCorporation, setForeignCorporation] = useState<"yes" | "no">("no");
+  const [rentalIncome, setRentalIncome] = useState(0);
+  const [rentalExpenses, setRentalExpenses] = useState(0);
   const [taxYear, setTaxYear] = useState(new Date().getFullYear() - 1);
+  const [filingStatus, setFilingStatus] = useState("single");
+  const [participationLevel, setParticipationLevel] = useState("active");
+  const [modifiedAgi, setModifiedAgi] = useState(0);
   const [filingResult, setFilingResult] = useState<FilingRequirement8825Result | null>(null);
 
-  // Penalty State
-  const [penaltyEntityType, setPenaltyEntityType] = useState("individual");
-  const [penaltyOwnershipPercent, setPenaltyOwnershipPercent] = useState(0);
-  const [penaltyUsOwners, setPenaltyUsOwners] = useState(1);
-  const [penaltyForeignCorporation, setPenaltyForeignCorporation] = useState<"yes" | "no">("no");
-  const [penaltyTaxYear, setPenaltyTaxYear] = useState(new Date().getFullYear() - 1);
-  const [isGeneralPartner, setIsGeneralPartner] = useState(false);
-  const [violationsCount, setViolationsCount] = useState(1);
-  const [daysUnreported, setDaysUnreported] = useState(0);
-  const [penaltyResult, setPenaltyResult] = useState<PenaltyResult8825 | null>(null);
+  // Income Summary State
+  const [rentsReceived, setRentsReceived] = useState(0);
+  const [advanceRents, setAdvanceRents] = useState(0);
+  const [securityDepositsRetained, setSecurityDepositsRetained] = useState(0);
+  const [tenantPaidExpenses, setTenantPaidExpenses] = useState(0);
+  const [incomeResult, setIncomeResult] = useState<IncomeSummary8825Result | null>(null);
+
+  // Expense Calculation State
+  const [advertising, setAdvertising] = useState(0);
+  const [autoTravel, setAutoTravel] = useState(0);
+  const [cleaningMaintenance, setCleaningMaintenance] = useState(0);
+  const [commissions, setCommissions] = useState(0);
+  const [insurance, setInsurance] = useState(0);
+  const [legalProfessionalFees, setLegalProfessionalFees] = useState(0);
+  const [managementFees, setManagementFees] = useState(0);
+  const [mortgageInterest, setMortgageInterest] = useState(0);
+  const [repairs, setRepairs] = useState(0);
+  const [supplies, setSupplies] = useState(0);
+  const [taxes, setTaxes] = useState(0);
+  const [utilities, setUtilities] = useState(0);
+  const [depreciation, setDepreciation] = useState(0);
+  const [otherExpenses, setOtherExpenses] = useState(0);
+  const [expenseResult, setExpenseResult] = useState<ExpenseCalculation8825Result | null>(null);
 
   // Overview
   const [overview, setOverview] = useState<Form8825Overview | null>(null);
@@ -100,10 +117,12 @@ export default function Form8825Page() {
     try {
       const data = await apiForm8825FilingRequirement({
         entity_type: entityType as any,
-        ownership_percent: ownershipPercent,
-        us_owners: usOwners,
-        foreign_corporation: foreignCorporation,
+        rental_income: rentalIncome,
+        rental_expenses: rentalExpenses,
         tax_year: taxYear,
+        filing_status: filingStatus as any,
+        participation_level: participationLevel as any,
+        modified_agi: modifiedAgi,
       });
       setFilingResult(data);
     } catch (err: unknown) {
@@ -113,21 +132,47 @@ export default function Form8825Page() {
     }
   };
 
-  const calculatePenalty = async () => {
+  const calculateIncomeSummary = async () => {
     setError(null);
     setLoading(true);
     try {
-      const data = await apiForm8825PenaltyCalculation({
-        entity_type: penaltyEntityType as any,
-        ownership_percent: penaltyOwnershipPercent,
-        us_owners: penaltyUsOwners,
-        foreign_corporation: penaltyForeignCorporation,
-        tax_year: penaltyTaxYear,
-        is_general_partner: isGeneralPartner,
-        violations_count: violationsCount,
-        days_unreported: daysUnreported,
+      const data = await apiForm8825IncomeSummary({
+        rents_received: rentsReceived,
+        advance_rents: advanceRents,
+        security_deposits_retained: securityDepositsRetained,
+        rental_expenses_paid_by_tenant: tenantPaidExpenses,
+        tax_year: taxYear,
       });
-      setPenaltyResult(data);
+      setIncomeResult(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateExpenses = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const data = await apiForm8825ExpenseCalculation({
+        advertising,
+        auto_travel: autoTravel,
+        cleaning_maintenance: cleaningMaintenance,
+        commissions,
+        insurance,
+        legal_professional_fees: legalProfessionalFees,
+        management_fees: managementFees,
+        mortgage_interest: mortgageInterest,
+        repairs,
+        supplies,
+        taxes,
+        utilities,
+        depreciation,
+        other_expenses: otherExpenses,
+        tax_year: taxYear,
+      });
+      setExpenseResult(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -170,7 +215,7 @@ export default function Form8825Page() {
               ← Back to Dashboard
             </Link>
             <h1 className="text-xl font-bold text-gray-900">
-              Form 8825: Foreign Partnerships
+              Form 8825: Rental Real Estate
             </h1>
           </div>
           <div className="text-sm text-gray-500">
@@ -193,14 +238,14 @@ export default function Form8825Page() {
             Filing Requirement
           </button>
           <button
-            onClick={() => setActiveTab("penalties")}
+            onClick={() => setActiveTab("income-expenses")}
             className={`px-4 py-2 font-medium text-sm rounded-t-lg ${
-              activeTab === "penalties"
+              activeTab === "income-expenses"
                 ? "bg-white text-blue-600 border border-b-white"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            Penalties
+            Income & Expenses
           </button>
           <button
             onClick={() => setActiveTab("overview")}
@@ -239,10 +284,10 @@ export default function Form8825Page() {
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="individual">Individual</option>
-                    <option value="corporation">Corporation</option>
-                    <option value="partnership">Partnership</option>
                     <option value="trust">Trust</option>
                     <option value="estate">Estate</option>
+                    <option value="partnership">Partnership</option>
+                    <option value="corporation">Corporation</option>
                     <option value="llc">LLC</option>
                   </select>
                 </div>
@@ -261,43 +306,70 @@ export default function Form8825Page() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ownership % (0-100)
+                    Rental Income ($)
                   </label>
                   <input
                     type="number"
-                    value={ownershipPercent}
-                    onChange={(e) => setOwnershipPercent(Number(e.target.value))}
+                    value={rentalIncome}
+                    onChange={(e) => setRentalIncome(Number(e.target.value))}
                     min={0}
-                    max={100}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Number of U.S. Owners
+                    Rental Expenses ($)
                   </label>
                   <input
                     type="number"
-                    value={usOwners}
-                    onChange={(e) => setUsOwners(Number(e.target.value))}
+                    value={rentalExpenses}
+                    onChange={(e) => setRentalExpenses(Number(e.target.value))}
                     min={0}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="flex items-center">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Filing Status
+                  </label>
+                  <select
+                    value={filingStatus}
+                    onChange={(e) => setFilingStatus(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="single">Single</option>
+                    <option value="married_filing_jointly">Married Filing Jointly</option>
+                    <option value="married_filing_separately">Married Filing Separately</option>
+                    <option value="head_of_household">Head of Household</option>
+                    <option value="qualifying_widow">Qualifying Widow(er)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Participation Level
+                  </label>
+                  <select
+                    value={participationLevel}
+                    onChange={(e) => setParticipationLevel(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="active">Active Participant</option>
+                    <option value="passive">Passive Participant</option>
+                    <option value="real_estate_professional">Real Estate Professional</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Modified AGI ($)
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={foreignCorporation === "yes"}
-                    onChange={(e) =>
-                      setForeignCorporation(e.target.checked ? "yes" : "no")
-                    }
-                    className="mr-2"
+                    type="number"
+                    value={modifiedAgi}
+                    onChange={(e) => setModifiedAgi(Number(e.target.value))}
+                    min={0}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-700">Foreign Corporation</span>
-                </label>
+                </div>
               </div>
 
               <button
@@ -353,6 +425,25 @@ export default function Form8825Page() {
                     </div>
                   )}
 
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    <div>
+                      <p className="text-sm text-gray-600">Net Rental Income</p>
+                      <p className="text-lg font-semibold">{fmtUSD(filingResult.net_rental_income)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Passive Loss Limit</p>
+                      <p className="text-lg font-semibold">{fmtUSD(filingResult.passive_loss_limit)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Allowed Passive Loss</p>
+                      <p className="text-lg font-semibold text-green-600">{fmtUSD(filingResult.allowed_passive_loss)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Suspended Passive Loss</p>
+                      <p className="text-lg font-semibold text-red-600">{fmtUSD(filingResult.suspended_passive_loss)}</p>
+                    </div>
+                  </div>
+
                   {filingResult.related_forms && filingResult.related_forms.length > 0 && (
                     <div>
                       <h3 className="font-medium text-gray-900 mb-2">Related Forms</h3>
@@ -363,12 +454,6 @@ export default function Form8825Page() {
                       </ul>
                     </div>
                   )}
-
-                  <div className="pt-4 border-t">
-                    <p className="text-sm text-gray-700">
-                      <strong>Penalty if Not Filed:</strong> {fmtUSD(filingResult.penalty_if_not_filed)}
-                    </p>
-                  </div>
                 </div>
               ) : (
                 <p className="text-gray-500 text-sm">
@@ -379,149 +464,299 @@ export default function Form8825Page() {
           </div>
         )}
 
-        {/* Penalties Tab */}
-        {activeTab === "penalties" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h2 className="text-lg font-semibold mb-4">Penalty Calculation</h2>
+        {/* Income & Expenses Tab */}
+        {activeTab === "income-expenses" && (
+          <div className="space-y-8">
+            {/* Income Summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <h2 className="text-lg font-semibold mb-4">Rental Income Summary</h2>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Entity Type
-                  </label>
-                  <select
-                    value={penaltyEntityType}
-                    onChange={(e) => setPenaltyEntityType(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="individual">Individual</option>
-                    <option value="corporation">Corporation</option>
-                    <option value="partnership">Partnership</option>
-                    <option value="trust">Trust</option>
-                    <option value="estate">Estate</option>
-                    <option value="llc">LLC</option>
-                  </select>
+                <div className="space-y-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Rents Received ($)
+                    </label>
+                    <input
+                      type="number"
+                      value={rentsReceived}
+                      onChange={(e) => setRentsReceived(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Advance Rents ($)
+                    </label>
+                    <input
+                      type="number"
+                      value={advanceRents}
+                      onChange={(e) => setAdvanceRents(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Security Deposits Retained ($)
+                    </label>
+                    <input
+                      type="number"
+                      value={securityDepositsRetained}
+                      onChange={(e) => setSecurityDepositsRetained(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Expenses Paid by Tenant ($)
+                    </label>
+                    <input
+                      type="number"
+                      value={tenantPaidExpenses}
+                      onChange={(e) => setTenantPaidExpenses(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tax Year
-                  </label>
-                  <input
-                    type="number"
-                    value={penaltyTaxYear}
-                    onChange={(e) => setPenaltyTaxYear(Number(e.target.value))}
-                    min={2000}
-                    max={2099}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ownership %
-                  </label>
-                  <input
-                    type="number"
-                    value={penaltyOwnershipPercent}
-                    onChange={(e) => setPenaltyOwnershipPercent(Number(e.target.value))}
-                    min={0}
-                    max={100}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    U.S. Owners
-                  </label>
-                  <input
-                    type="number"
-                    value={penaltyUsOwners}
-                    onChange={(e) => setPenaltyUsOwners(Number(e.target.value))}
-                    min={0}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Violations Count
-                  </label>
-                  <input
-                    type="number"
-                    value={violationsCount}
-                    onChange={(e) => setViolationsCount(Number(e.target.value))}
-                    min={1}
-                    max={10}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Days Unreported
-                  </label>
-                  <input
-                    type="number"
-                    value={daysUnreported}
-                    onChange={(e) => setDaysUnreported(Number(e.target.value))}
-                    min={0}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+
+                <button
+                  onClick={calculateIncomeSummary}
+                  disabled={loading}
+                  className="w-full py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading ? "Calculating..." : "Calculate Income Summary"}
+                </button>
               </div>
 
-              <div className="mb-4 space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={penaltyForeignCorporation === "yes"}
-                    onChange={(e) =>
-                      setPenaltyForeignCorporation(e.target.checked ? "yes" : "no")
-                    }
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-700">Foreign Corporation</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={isGeneralPartner}
-                    onChange={(e) => setIsGeneralPartner(e.target.checked)}
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-700">General Partner</span>
-                </label>
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <h2 className="text-lg font-semibold mb-4">Income Result</h2>
+                {incomeResult ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm mb-2">
+                        <strong>Gross Rental Income:</strong> {fmtUSD(incomeResult.gross_rental_income)}
+                      </p>
+                      <p className="text-sm mb-2">
+                        <strong>Advance Rents:</strong> {fmtUSD(incomeResult.advance_rents)}
+                      </p>
+                      <p className="text-sm mb-2">
+                        <strong>Security Deposits Retained:</strong> {fmtUSD(incomeResult.security_deposits_retained)}
+                      </p>
+                      <p className="text-sm mb-2">
+                        <strong>Tenant-Paid Expenses:</strong> {fmtUSD(incomeResult.tenant_paid_expenses)}
+                      </p>
+                      <p className="text-lg font-bold mt-3">
+                        <strong>Total Rental Income:</strong> {fmtUSD(incomeResult.total_rental_income)}
+                      </p>
+                    </div>
+                    <pre className="text-xs text-gray-600 whitespace-pre-wrap">{incomeResult.explanation}</pre>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">
+                    Fill out the form and click &quot;Calculate Income Summary&quot; to see your total rental income.
+                  </p>
+                )}
               </div>
-
-              <button
-                onClick={calculatePenalty}
-                disabled={loading}
-                className="w-full py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? "Calculating..." : "Calculate Penalty"}
-              </button>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h2 className="text-lg font-semibold mb-4">Result</h2>
-              {penaltyResult ? (
-                <div className="space-y-4">
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm mb-2">
-                      <strong>Base Penalty:</strong> {fmtUSD(penaltyResult.base_penalty)}
-                    </p>
-                    <p className="text-sm mb-2">
-                      <strong>Continued Failure Penalty:</strong> {fmtUSD(penaltyResult.continued_failure_penalty)}
-                    </p>
-                    <p className="text-lg font-bold mt-3">
-                      <strong>Total Penalty:</strong> {fmtUSD(penaltyResult.total_penalty)}
-                    </p>
+            {/* Expense Calculation */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <h2 className="text-lg font-semibold mb-4">Rental Expenses</h2>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Advertising</label>
+                    <input
+                      type="number"
+                      value={advertising}
+                      onChange={(e) => setAdvertising(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
-                  <p className="text-sm text-gray-700">{penaltyResult.explanation}</p>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Auto & Travel</label>
+                    <input
+                      type="number"
+                      value={autoTravel}
+                      onChange={(e) => setAutoTravel(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cleaning & Maintenance</label>
+                    <input
+                      type="number"
+                      value={cleaningMaintenance}
+                      onChange={(e) => setCleaningMaintenance(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Commissions</label>
+                    <input
+                      type="number"
+                      value={commissions}
+                      onChange={(e) => setCommissions(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Insurance</label>
+                    <input
+                      type="number"
+                      value={insurance}
+                      onChange={(e) => setInsurance(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Legal & Professional Fees</label>
+                    <input
+                      type="number"
+                      value={legalProfessionalFees}
+                      onChange={(e) => setLegalProfessionalFees(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Management Fees</label>
+                    <input
+                      type="number"
+                      value={managementFees}
+                      onChange={(e) => setManagementFees(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mortgage Interest</label>
+                    <input
+                      type="number"
+                      value={mortgageInterest}
+                      onChange={(e) => setMortgageInterest(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Repairs</label>
+                    <input
+                      type="number"
+                      value={repairs}
+                      onChange={(e) => setRepairs(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplies</label>
+                    <input
+                      type="number"
+                      value={supplies}
+                      onChange={(e) => setSupplies(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Property Taxes</label>
+                    <input
+                      type="number"
+                      value={taxes}
+                      onChange={(e) => setTaxes(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Utilities</label>
+                    <input
+                      type="number"
+                      value={utilities}
+                      onChange={(e) => setUtilities(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Depreciation</label>
+                    <input
+                      type="number"
+                      value={depreciation}
+                      onChange={(e) => setDepreciation(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Other Expenses</label>
+                    <input
+                      type="number"
+                      value={otherExpenses}
+                      onChange={(e) => setOtherExpenses(Number(e.target.value))}
+                      min={0}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
-              ) : (
-                <p className="text-gray-500 text-sm">
-                  Fill out the form and click &quot;Calculate Penalty&quot; to see potential penalties.
-                </p>
-              )}
+
+                <button
+                  onClick={calculateExpenses}
+                  disabled={loading}
+                  className="w-full py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading ? "Calculating..." : "Calculate Expenses"}
+                </button>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <h2 className="text-lg font-semibold mb-4">Expense Result</h2>
+                {expenseResult ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm mb-2">
+                        <strong>Total Expenses:</strong> {fmtUSD(expenseResult.total_expenses)}
+                      </p>
+                      <p className="text-sm mb-2">
+                        <strong>Deductible Expenses:</strong> {fmtUSD(expenseResult.deductible_expenses)}
+                      </p>
+                      <p className="text-sm mb-2">
+                        <strong>Non-Deductible Expenses:</strong> {fmtUSD(expenseResult.non_deductible_expenses)}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900 mb-2">Expense Breakdown</h3>
+                      <div className="space-y-1">
+                        {Object.entries(expenseResult.expense_breakdown)
+                          .filter(([, amount]) => amount > 0)
+                          .map(([category, amount]) => (
+                            <div key={category} className="flex justify-between text-sm">
+                              <span className="text-gray-600">
+                                {category.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                              </span>
+                              <span className="font-medium">{fmtUSD(amount)}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">
+                    Fill out the form and click &quot;Calculate Expenses&quot; to see your total rental expenses.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -541,22 +776,27 @@ export default function Form8825Page() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="font-medium text-blue-900 mb-2">Ownership Threshold</h3>
-                <p className="text-sm text-blue-800">{overview.ownership_threshold}</p>
-              </div>
               <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h3 className="font-medium text-green-900 mb-2">Control Threshold</h3>
-                <p className="text-sm text-green-800">{overview.control_threshold}</p>
+                <h3 className="font-medium text-green-900 mb-2">Income Types</h3>
+                <ul className="list-disc list-inside text-sm text-green-800 space-y-1">
+                  {overview.income_types.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
               </div>
-              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                <h3 className="font-medium text-purple-900 mb-2">General Partner Rule</h3>
-                <p className="text-sm text-purple-800">{overview.general_partner_rule}</p>
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="font-medium text-blue-900 mb-2">Expense Categories</h3>
+                <ul className="list-disc list-inside text-sm text-blue-800 space-y-1">
+                  {overview.expense_categories.slice(0, 7).map((item, i) => (
+                    <li key={i}>{item.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</li>
+                  ))}
+                </ul>
               </div>
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <h3 className="font-medium text-red-900 mb-2">Penalties</h3>
-                <p className="text-sm text-red-800">{overview.penalties}</p>
-              </div>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="font-medium text-gray-900 mb-2">Passive Loss Rules</h3>
+              <p className="text-sm text-gray-700">{overview.passive_loss_rules}</p>
             </div>
 
             <div className="mb-6">

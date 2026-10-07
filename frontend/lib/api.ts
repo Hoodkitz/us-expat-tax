@@ -883,46 +883,76 @@ export async function apiForm8843Overview(): Promise<Form8843Overview> {
 }
 
 // -----------------------------------------------------------------------
-// Form 8825 — Information Return by a U.S. Person with Respect to Certain Foreign Partnerships
+// Form 8825 — Rental Real Estate Income and Expenses
 // -----------------------------------------------------------------------
 
 export interface FilingRequirement8825Request {
-  entity_type: "individual" | "corporation" | "partnership" | "trust" | "estate" | "llc";
-  ownership_percent: number;
-  us_owners: number;
-  foreign_corporation: "yes" | "no";
+  entity_type: "individual" | "trust" | "estate" | "partnership" | "corporation" | "llc";
+  rental_income: number;
+  rental_expenses: number;
   tax_year: number;
+  filing_status: "single" | "married_filing_jointly" | "married_filing_separately" | "head_of_household" | "qualifying_widow";
+  participation_level: "active" | "passive" | "real_estate_professional";
+  modified_agi: number;
 }
 
 export interface FilingRequirement8825Result {
   filing_required: boolean;
   reasons: string[];
-  ownership_percent: number;
+  rental_income: number;
+  rental_expenses: number;
+  net_rental_income: number;
   entity_type: string;
   tax_year: number;
-  penalty_if_not_filed: number;
+  passive_loss_limit: number;
+  allowed_passive_loss: number;
+  suspended_passive_loss: number;
   related_forms: string[];
   recommendation: string;
 }
 
-export interface PenaltyCalculation8825Request {
-  entity_type: "individual" | "corporation" | "partnership" | "trust" | "estate" | "llc";
-  ownership_percent: number;
-  us_owners: number;
-  foreign_corporation: "yes" | "no";
+export interface IncomeSummary8825Request {
+  rents_received: number;
+  advance_rents: number;
+  security_deposits_retained: number;
+  rental_expenses_paid_by_tenant: number;
   tax_year: number;
-  is_general_partner: boolean;
-  violations_count: number;
-  days_unreported: number;
 }
 
-export interface PenaltyResult8825 {
-  base_penalty: number;
-  continued_failure_penalty: number;
-  total_penalty: number;
-  violations_count: number;
-  days_unreported: number;
-  is_general_partner: boolean;
+export interface IncomeSummary8825Result {
+  gross_rental_income: number;
+  advance_rents: number;
+  security_deposits_retained: number;
+  tenant_paid_expenses: number;
+  total_rental_income: number;
+  tax_year: number;
+  explanation: string;
+}
+
+export interface ExpenseCalculation8825Request {
+  advertising: number;
+  auto_travel: number;
+  cleaning_maintenance: number;
+  commissions: number;
+  insurance: number;
+  legal_professional_fees: number;
+  management_fees: number;
+  mortgage_interest: number;
+  repairs: number;
+  supplies: number;
+  taxes: number;
+  utilities: number;
+  depreciation: number;
+  other_expenses: number;
+  tax_year: number;
+}
+
+export interface ExpenseCalculation8825Result {
+  total_expenses: number;
+  expense_breakdown: Record<string, number>;
+  deductible_expenses: number;
+  non_deductible_expenses: number;
+  tax_year: number;
   explanation: string;
 }
 
@@ -930,12 +960,11 @@ export interface Form8825Overview {
   title: string;
   description: string;
   who_must_file: string[];
-  ownership_threshold: string;
-  control_threshold: string;
-  general_partner_rule: string;
-  penalties: string;
-  related_forms: string[];
+  income_types: string[];
+  expense_categories: string[];
+  passive_loss_rules: string;
   filing_deadline: string;
+  related_forms: string[];
   recommendation: string;
 }
 
@@ -954,11 +983,11 @@ export async function apiForm8825FilingRequirement(
   return handleResponse<FilingRequirement8825Result>(res);
 }
 
-export async function apiForm8825PenaltyCalculation(
-  payload: PenaltyCalculation8825Request
-): Promise<PenaltyResult8825> {
+export async function apiForm8825IncomeSummary(
+  payload: IncomeSummary8825Request
+): Promise<IncomeSummary8825Result> {
   const token = getToken();
-  const res = await fetch(`${API_BASE}/api/v1/form8825/penalty-calculation`, {
+  const res = await fetch(`${API_BASE}/api/v1/form8825/income-summary`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -966,7 +995,22 @@ export async function apiForm8825PenaltyCalculation(
     },
     body: JSON.stringify(payload),
   });
-  return handleResponse<PenaltyResult8825>(res);
+  return handleResponse<IncomeSummary8825Result>(res);
+}
+
+export async function apiForm8825ExpenseCalculation(
+  payload: ExpenseCalculation8825Request
+): Promise<ExpenseCalculation8825Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8825/expense-calculation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<ExpenseCalculation8825Result>(res);
 }
 
 export async function apiForm8825Overview(): Promise<Form8825Overview> {
