@@ -17,20 +17,18 @@ from app.models.form1040nr import (
 client = TestClient(app)
 
 
-# Mock authentication
-@pytest.fixture
-def mock_auth_headers():
-    return {"Authorization": "Bearer mock_token"}
-
-
 class TestSubstantialPresenceTest:
     """Test Substantial Presence Test calculations"""
     
-    def test_spt_passes_current_year_only(self, mock_auth_headers):
+    @pytest.fixture(autouse=True)
+    def setup(self, override_auth_dependency):
+        """Use the auth override for all tests in this class"""
+        pass
+    
+    def test_spt_passes_current_year_only(self):
         """Test SPT passes with 183+ days in current year"""
         response = client.post(
             "/api/v1/form1040nr/filing-requirement",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "days_in_us_current_year": 200,
@@ -46,11 +44,10 @@ class TestSubstantialPresenceTest:
         assert data["passes_substantial_presence_test"] is True
         assert data["resident_status"] == "resident"
     
-    def test_spt_passes_with_prior_years(self, mock_auth_headers):
+    def test_spt_passes_with_prior_years(self):
         """Test SPT passes with weighted prior year days"""
         response = client.post(
             "/api/v1/form1040nr/filing-requirement",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "days_in_us_current_year": 120,
@@ -66,11 +63,10 @@ class TestSubstantialPresenceTest:
         assert float(data["substantial_presence_days"]) >= 183
         assert data["passes_substantial_presence_test"] is True
     
-    def test_spt_fails_insufficient_days(self, mock_auth_headers):
+    def test_spt_fails_insufficient_days(self):
         """Test SPT fails with insufficient days"""
         response = client.post(
             "/api/v1/form1040nr/filing-requirement",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "days_in_us_current_year": 100,
@@ -87,11 +83,10 @@ class TestSubstantialPresenceTest:
         assert data["passes_substantial_presence_test"] is False
         assert data["resident_status"] == "non_resident"
     
-    def test_dual_status_year(self, mock_auth_headers):
+    def test_dual_status_year(self):
         """Test dual-status year determination"""
         response = client.post(
             "/api/v1/form1040nr/filing-requirement",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "days_in_us_current_year": 150,
@@ -110,11 +105,15 @@ class TestSubstantialPresenceTest:
 class TestTreatyTiebreaker:
     """Test treaty tiebreaker rules"""
     
-    def test_treaty_resident_tiebreaker(self, mock_auth_headers):
+    @pytest.fixture(autouse=True)
+    def setup(self, override_auth_dependency):
+        """Use the auth override for all tests in this class"""
+        pass
+    
+    def test_treaty_resident_tiebreaker(self):
         """Test treaty tiebreaker for closer connection"""
         response = client.post(
             "/api/v1/form1040nr/filing-requirement",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "days_in_us_current_year": 200,
@@ -129,11 +128,10 @@ class TestTreatyTiebreaker:
         assert data["treaty_exemption_applies"] is True
         assert data["passes_substantial_presence_test"] is True
     
-    def test_student_treaty_exemption(self, mock_auth_headers):
+    def test_student_treaty_exemption(self):
         """Test student exemption under treaty"""
         response = client.post(
             "/api/v1/form1040nr/filing-requirement",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "days_in_us_current_year": 200,
@@ -147,11 +145,10 @@ class TestTreatyTiebreaker:
         data = response.json()
         assert "Student from treaty country" in data["reasoning"]
     
-    def test_teacher_treaty_exemption(self, mock_auth_headers):
+    def test_teacher_treaty_exemption(self):
         """Test teacher exemption under treaty"""
         response = client.post(
             "/api/v1/form1040nr/filing-requirement",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "days_in_us_current_year": 180,
@@ -167,9 +164,14 @@ class TestTreatyTiebreaker:
 
 
 class TestWithholdingChapter3And4:
-    """Test Chapter 3 and Chapter 4 withholding"""
+    """Test Chapter 3 and Chapter 4 withholding"""    
+    @pytest.fixture(autouse=True)
+    def setup(self, override_auth_dependency):
+        """Use the auth override for all tests in this class"""
+        pass
+
     
-    def test_chapter_3_withholding_credit(self, mock_auth_headers):
+    def test_chapter_3_withholding_credit(self):
         """Test Chapter 3 (30%) withholding credit"""
         response = client.post(
             "/api/v1/form1040nr/withholding-credit",
@@ -188,7 +190,7 @@ class TestWithholdingChapter3And4:
         assert data["total_credits"] == "20000"
         assert data["refundable_amount"] == "20000"
     
-    def test_chapter_4_fatca_withholding(self, mock_auth_headers):
+    def test_chapter_4_fatca_withholding(self):
         """Test Chapter 4 (FATCA) withholding credit"""
         response = client.post(
             "/api/v1/form1040nr/withholding-credit",
@@ -207,7 +209,7 @@ class TestWithholdingChapter3And4:
         assert data["total_backup_credit"] == "1200"
         assert data["total_credits"] == "9200"
     
-    def test_combined_withholding_credits(self, mock_auth_headers):
+    def test_combined_withholding_credits(self):
         """Test combined withholding credits"""
         response = client.post(
             "/api/v1/form1040nr/withholding-credit",
@@ -228,9 +230,14 @@ class TestWithholdingChapter3And4:
 
 
 class TestFDAPvsECI:
-    """Test FDAP vs ECI income classification and taxation"""
+    """Test FDAP vs ECI income classification and taxation"""    
+    @pytest.fixture(autouse=True)
+    def setup(self, override_auth_dependency):
+        """Use the auth override for all tests in this class"""
+        pass
+
     
-    def test_fdap_income_30_percent_tax(self, mock_auth_headers):
+    def test_fdap_income_30_percent_tax(self):
         """Test FDAP income taxed at flat 30%"""
         response = client.post(
             "/api/v1/form1040nr/income-summary",
@@ -256,7 +263,7 @@ class TestFDAPvsECI:
         # FDAP tax = 50000 * 0.30 = 15000
         assert float(data["total_tax_before_credits"]) == 15000
     
-    def test_eci_progressive_taxation(self, mock_auth_headers):
+    def test_eci_progressive_taxation(self):
         """Test ECI income taxed at progressive rates"""
         response = client.post(
             "/api/v1/form1040nr/income-summary",
@@ -284,7 +291,7 @@ class TestFDAPvsECI:
         assert float(data["total_tax_before_credits"]) > 0
         assert float(data["total_tax_before_credits"]) < 10000
     
-    def test_mixed_eci_and_fdap(self, mock_auth_headers):
+    def test_mixed_eci_and_fdap(self):
         """Test mixed ECI and FDAP income"""
         response = client.post(
             "/api/v1/form1040nr/income-summary",
@@ -316,7 +323,7 @@ class TestFDAPvsECI:
         assert data["total_fdap"] == "20000"
         assert data["total_us_sourced"] == "70000"
     
-    def test_treaty_exempt_income(self, mock_auth_headers):
+    def test_treaty_exempt_income(self):
         """Test treaty-exempt income exclusion"""
         response = client.post(
             "/api/v1/form1040nr/income-summary",
@@ -351,9 +358,14 @@ class TestFDAPvsECI:
 
 
 class TestPenaltyCalculation:
-    """Test §6072 late filing penalty calculations"""
+    """Test §6072 late filing penalty calculations"""    
+    @pytest.fixture(autouse=True)
+    def setup(self, override_auth_dependency):
+        """Use the auth override for all tests in this class"""
+        pass
+
     
-    def test_no_penalty_on_time_filing(self, mock_auth_headers):
+    def test_no_penalty_on_time_filing(self):
         """Test no penalty when filed on time"""
         filing_deadline = date(2025, 6, 15)
         response = client.post(
@@ -373,7 +385,7 @@ class TestPenaltyCalculation:
         assert data["days_late"] == 0
         assert data["total_penalties"] == "0.00"
     
-    def test_late_filing_penalty_5_percent_per_month(self, mock_auth_headers):
+    def test_late_filing_penalty_5_percent_per_month(self):
         """Test 5% per month late filing penalty"""
         filing_deadline = date(2025, 6, 15)
         actual_date = filing_deadline + timedelta(days=60)  # 2 months late
@@ -395,7 +407,7 @@ class TestPenaltyCalculation:
         # 2 months * 5% = 10% of 10000 = 1000
         assert float(data["late_filing_penalty"]) >= 1000
     
-    def test_late_payment_penalty_half_percent_per_month(self, mock_auth_headers):
+    def test_late_payment_penalty_half_percent_per_month(self):
         """Test 0.5% per month late payment penalty"""
         filing_deadline = date(2025, 6, 15)
         actual_date = filing_deadline + timedelta(days=30)  # 1 month late
@@ -416,7 +428,7 @@ class TestPenaltyCalculation:
         # Late payment penalty: 1 month * 0.5% = 0.5% of 10000 = 50
         assert float(data["late_payment_penalty"]) >= 50
     
-    def test_minimum_penalty_200_dollars(self, mock_auth_headers):
+    def test_minimum_penalty_200_dollars(self):
         """Test minimum penalty of $200"""
         filing_deadline = date(2025, 6, 15)
         actual_date = filing_deadline + timedelta(days=90)  # 3 months late
@@ -437,7 +449,7 @@ class TestPenaltyCalculation:
         assert data["minimum_penalty_applies"] is True
         assert float(data["late_filing_penalty"]) >= 100  # Min is lesser of 200 or tax
     
-    def test_interest_charges(self, mock_auth_headers):
+    def test_interest_charges(self):
         """Test interest charges on late payment"""
         filing_deadline = date(2025, 6, 15)
         actual_date = filing_deadline + timedelta(days=365)  # 1 year late
@@ -459,7 +471,7 @@ class TestPenaltyCalculation:
         assert float(data["interest_charges"]) >= 750
         assert float(data["interest_charges"]) <= 850
     
-    def test_reasonable_cause_waiver(self, mock_auth_headers):
+    def test_reasonable_cause_waiver(self):
         """Test reasonable cause penalty waiver"""
         filing_deadline = date(2025, 6, 15)
         actual_date = filing_deadline + timedelta(days=60)
@@ -483,7 +495,7 @@ class TestPenaltyCalculation:
         assert data["late_payment_penalty"] == "0.00"
         assert float(data["interest_charges"]) > 0
     
-    def test_extension_filing(self, mock_auth_headers):
+    def test_extension_filing(self):
         """Test extension adjusts deadline"""
         filing_deadline = date(2025, 6, 15)
         # File 100 days after deadline, but extension was filed
@@ -508,13 +520,17 @@ class TestPenaltyCalculation:
 
 
 class TestFilingDeadlines:
-    """Test filing deadline determination"""
+    """Test filing deadline determination"""    
+    @pytest.fixture(autouse=True)
+    def setup(self, override_auth_dependency):
+        """Use the auth override for all tests in this class"""
+        pass
+
     
-    def test_non_resident_june_15_deadline(self, mock_auth_headers):
+    def test_non_resident_june_15_deadline(self):
         """Test non-resident deadline is June 15"""
         response = client.post(
             "/api/v1/form1040nr/filing-requirement",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "days_in_us_current_year": 100,
@@ -527,11 +543,10 @@ class TestFilingDeadlines:
         assert data["filing_deadline"] == "2025-06-15"
         assert data["extension_deadline"] == "2025-10-15"
     
-    def test_dual_status_april_15_deadline(self, mock_auth_headers):
+    def test_dual_status_april_15_deadline(self):
         """Test dual-status deadline is April 15"""
         response = client.post(
             "/api/v1/form1040nr/filing-requirement",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "days_in_us_current_year": 150,
@@ -546,9 +561,14 @@ class TestFilingDeadlines:
 
 
 class TestOverview:
-    """Test overview endpoint"""
+    """Test overview endpoint"""    
+    @pytest.fixture(autouse=True)
+    def setup(self, override_auth_dependency):
+        """Use the auth override for all tests in this class"""
+        pass
+
     
-    def test_overview_returns_structure(self, mock_auth_headers):
+    def test_overview_returns_structure(self):
         """Test overview returns proper structure"""
         response = client.get(
             "/api/v1/form1040nr/overview?tax_year=2024",

@@ -6,9 +6,13 @@ from app.main import app
 from app.auth.utils import get_current_tenant
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def override_auth_dependency():
-    """Override get_current_tenant for all tests to avoid 401 errors."""
+    """Override get_current_tenant for tests that need it.
+    
+    Usage: Add this fixture as a parameter to test functions that call
+    protected endpoints without real authentication.
+    """
     
     async def mock_get_current_tenant():
         """Return a mock tenant dict for testing."""
