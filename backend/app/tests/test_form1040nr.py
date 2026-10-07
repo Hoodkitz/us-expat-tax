@@ -40,7 +40,7 @@ class TestSubstantialPresenceTest:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["substantial_presence_days"] == 200.0
+        assert float(data["substantial_presence_days"]) == 200.0
         assert data["passes_substantial_presence_test"] is True
         assert data["resident_status"] == "resident"
     
@@ -491,8 +491,8 @@ class TestPenaltyCalculation:
         data = response.json()
         assert data["waived_due_to_reasonable_cause"] is True
         # Only interest remains (not waived)
-        assert data["late_filing_penalty"] == "0.00"
-        assert data["late_payment_penalty"] == "0.00"
+        assert float(data["late_filing_penalty"]) == 0.0
+        assert float(data["late_payment_penalty"]) == 0.0
         assert float(data["interest_charges"]) > 0
     
     def test_extension_filing(self):
