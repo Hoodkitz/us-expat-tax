@@ -3,8 +3,8 @@ Schedule C API Router - Profit or Loss From Business (Sole Proprietorship)
 """
 from fastapi import APIRouter, Depends
 
-from app.dependencies import get_current_tenant
-from backend.app.modules.schedule_c import (
+from app.auth.utils import get_current_tenant
+from app.modules.schedule_c import (
     ScheduleCIncomeExpensesInput,
     HomeOfficeSimplifiedInput,
     HomeOfficeActualInput,

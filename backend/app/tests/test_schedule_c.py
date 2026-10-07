@@ -3,7 +3,7 @@ Comprehensive tests for Schedule C Business Income and Deductions.
 IRC §162, IRC §280A (Home Office), IRC §274 (Vehicle & Meals).
 """
 import pytest
-from backend.app.modules.schedule_c import (
+from app.modules.schedule_c import (
     ScheduleCIncomeExpensesInput,
     HomeOfficeSimplifiedInput,
     HomeOfficeActualInput,
