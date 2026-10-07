@@ -176,7 +176,6 @@ class TestWithholdingChapter3And4:
         """Test Chapter 3 (30%) withholding credit"""
         response = client.post(
             "/api/v1/form1040nr/withholding-credit",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "chapter_3_withheld": 15000,
@@ -195,7 +194,6 @@ class TestWithholdingChapter3And4:
         """Test Chapter 4 (FATCA) withholding credit"""
         response = client.post(
             "/api/v1/form1040nr/withholding-credit",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "chapter_3_withheld": 0,
@@ -214,7 +212,6 @@ class TestWithholdingChapter3And4:
         """Test combined withholding credits"""
         response = client.post(
             "/api/v1/form1040nr/withholding-credit",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "chapter_3_withheld": 10000,
@@ -242,7 +239,6 @@ class TestFDAPvsECI:
         """Test FDAP income taxed at flat 30%"""
         response = client.post(
             "/api/v1/form1040nr/income-summary",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "income_items": [
@@ -268,7 +264,6 @@ class TestFDAPvsECI:
         """Test ECI income taxed at progressive rates"""
         response = client.post(
             "/api/v1/form1040nr/income-summary",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "income_items": [
@@ -296,7 +291,6 @@ class TestFDAPvsECI:
         """Test mixed ECI and FDAP income"""
         response = client.post(
             "/api/v1/form1040nr/income-summary",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "income_items": [
@@ -328,7 +322,6 @@ class TestFDAPvsECI:
         """Test treaty-exempt income exclusion"""
         response = client.post(
             "/api/v1/form1040nr/income-summary",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "income_items": [
@@ -371,7 +364,6 @@ class TestPenaltyCalculation:
         filing_deadline = date(2025, 6, 15)
         response = client.post(
             "/api/v1/form1040nr/penalty-calculator",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "filing_deadline": filing_deadline.isoformat(),
@@ -392,7 +384,6 @@ class TestPenaltyCalculation:
         actual_date = filing_deadline + timedelta(days=60)  # 2 months late
         response = client.post(
             "/api/v1/form1040nr/penalty-calculator",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "filing_deadline": filing_deadline.isoformat(),
@@ -414,7 +405,6 @@ class TestPenaltyCalculation:
         actual_date = filing_deadline + timedelta(days=30)  # 1 month late
         response = client.post(
             "/api/v1/form1040nr/penalty-calculator",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "filing_deadline": filing_deadline.isoformat(),
@@ -435,7 +425,6 @@ class TestPenaltyCalculation:
         actual_date = filing_deadline + timedelta(days=90)  # 3 months late
         response = client.post(
             "/api/v1/form1040nr/penalty-calculator",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "filing_deadline": filing_deadline.isoformat(),
@@ -456,7 +445,6 @@ class TestPenaltyCalculation:
         actual_date = filing_deadline + timedelta(days=365)  # 1 year late
         response = client.post(
             "/api/v1/form1040nr/penalty-calculator",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "filing_deadline": filing_deadline.isoformat(),
@@ -478,7 +466,6 @@ class TestPenaltyCalculation:
         actual_date = filing_deadline + timedelta(days=60)
         response = client.post(
             "/api/v1/form1040nr/penalty-calculator",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "filing_deadline": filing_deadline.isoformat(),
@@ -503,7 +490,6 @@ class TestPenaltyCalculation:
         actual_date = filing_deadline + timedelta(days=100)
         response = client.post(
             "/api/v1/form1040nr/penalty-calculator",
-            headers=mock_auth_headers,
             json={
                 "tax_year": 2024,
                 "filing_deadline": filing_deadline.isoformat(),
@@ -573,7 +559,6 @@ class TestOverview:
         """Test overview returns proper structure"""
         response = client.get(
             "/api/v1/form1040nr/overview?tax_year=2024",
-            headers=mock_auth_headers,
         )
         assert response.status_code == 200
         data = response.json()
