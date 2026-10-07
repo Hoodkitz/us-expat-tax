@@ -527,6 +527,134 @@ export async function apiForm8938Overview(): Promise<Form8938Overview> {
   return handleResponse<Form8938Overview>(res);
 }
 
+// Extended Form 8938 Features
+
+export interface ForeignTrust8938Request {
+  trust_name: string;
+  trust_type: "grantor" | "beneficiary" | "other";
+  country: string;
+  fair_market_value_usd: number;
+  distributions_received_usd: number;
+  is_grantor: boolean;
+}
+
+export interface ForeignTrust8938Result {
+  reporting_required: boolean;
+  trust_type: string;
+  is_grantor_trust: boolean;
+  required_forms: string[];
+  fair_market_value_usd: number;
+  penalties_if_not_reported: string;
+  explanation: string;
+}
+
+export async function apiForm8938TrustReporting(
+  payload: ForeignTrust8938Request
+): Promise<ForeignTrust8938Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8938/trust-reporting`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<ForeignTrust8938Result>(res);
+}
+
+export interface JointFilingThreshold8938Request {
+  filing_status: "single" | "mfj" | "mfs" | "hoh";
+  residency_status: "domestic" | "abroad";
+  year_end_value_usd: number;
+  max_any_time_value_usd: number;
+  tax_year: number;
+}
+
+export interface JointFilingThreshold8938Result {
+  filing_required: boolean;
+  filing_status: string;
+  residency_status: string;
+  applicable_threshold_year_end: number;
+  applicable_threshold_any_time: number;
+  reasons: string[];
+  recommendation: string;
+}
+
+export async function apiForm8938JointFilingCheck(
+  payload: JointFilingThreshold8938Request
+): Promise<JointFilingThreshold8938Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8938/joint-filing-check`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<JointFilingThreshold8938Result>(res);
+}
+
+export interface AccuracyPenalty8938Request {
+  underpayment_amount_usd: number;
+  total_foreign_assets_usd: number;
+  tax_year: number;
+}
+
+export interface AccuracyPenalty8938Result {
+  penalty_rate: number;
+  penalty_amount: number;
+  underpayment_amount: number;
+  total_foreign_assets: number;
+  explanation: string;
+}
+
+export async function apiForm8938AccuracyPenalty(
+  payload: AccuracyPenalty8938Request
+): Promise<AccuracyPenalty8938Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8938/accuracy-penalty`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<AccuracyPenalty8938Result>(res);
+}
+
+export interface StatuteOfLimitations8938Request {
+  foreign_assets_disclosed: boolean;
+  foreign_asset_value_usd: number;
+  gross_income_usd: number;
+  tax_year: number;
+}
+
+export interface StatuteOfLimitations8938Result {
+  statute_years: number;
+  is_extended: boolean;
+  foreign_assets_disclosed: boolean;
+  assessment_deadline_year: number;
+  explanation: string;
+}
+
+export async function apiForm8938StatuteOfLimitations(
+  payload: StatuteOfLimitations8938Request
+): Promise<StatuteOfLimitations8938Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8938/statute-of-limitations`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<StatuteOfLimitations8938Result>(res);
+}
+
 // -----------------------------------------------------------------------
 // Form 8865 Foreign Partnerships types & API
 // -----------------------------------------------------------------------
