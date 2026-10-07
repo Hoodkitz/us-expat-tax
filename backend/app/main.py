@@ -39,6 +39,7 @@ from app.routers.form8854_router import router as form8854_router
 from app.routers.elster_router import router as elster_router
 from app.routers.schedule_se_router import router as schedule_se_router
 from app.routers.schedule_c_router import router as schedule_c_router
+from app.routers.form1040nr import router as form1040nr_router
 from app.modules.logic_engine import TaxpayerInput, evaluate as evaluate_tax
 from app.modules.compliance_state import compute_compliance_flags
 from app.modules.submission_saga import (
@@ -94,6 +95,7 @@ app.include_router(form8854_router)
 app.include_router(elster_router, prefix="/api/v1/elster")
 app.include_router(schedule_se_router, prefix="/api/v1/schedule-se")
 app.include_router(schedule_c_router, prefix="/api/v1/schedule-c")
+app.include_router(form1040nr_router)
 
 # ---------------------------------------------------------------------------
 # Request-Modelle
