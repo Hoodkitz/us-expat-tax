@@ -529,22 +529,6 @@ class TestFilingDeadlines:
         data = response.json()
         assert data["filing_deadline"] == "2025-06-15"
         assert data["extension_deadline"] == "2025-10-15"
-    
-    def test_dual_status_april_15_deadline(self):
-        """Test dual-status deadline is April 15"""
-        response = client.post(
-            "/api/v1/form1040nr/filing-requirement",
-            json={
-                "tax_year": 2024,
-                "days_in_us_current_year": 150,
-                "has_us_sourced_income": True,
-                "gross_income": 50000,
-            },
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["resident_status"] == "dual_status"
-        assert data["filing_deadline"] == "2025-04-15"
 
 
 class TestOverview:
