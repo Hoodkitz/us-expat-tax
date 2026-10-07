@@ -20,7 +20,7 @@ from app.models.form1040nr import (
     IncomeType,
     WithholdingType,
 )
-from app.core.auth import get_current_user
+from app.auth.utils import get_current_tenant
 
 router = APIRouter(prefix="/api/v1/form1040nr", tags=["form1040nr"])
 
@@ -71,9 +71,9 @@ def calculate_progressive_tax(income: Decimal) -> Decimal:
 
 
 @router.post("/filing-requirement", response_model=FilingRequirementResponse)
-def determine_filing_requirement(
+async def check_filing_requirement(
     request: FilingRequirementRequest,
-    current_user: dict = Depends(get_current_user),
+    current_tenant: dict = Depends(get_current_tenant),
 ):
     """
     Determine if non-resident alien must file Form 1040-NR.
@@ -157,7 +157,7 @@ def determine_filing_requirement(
 @router.post("/income-summary", response_model=IncomeSummaryResponse)
 def calculate_income_summary(
     request: IncomeSummaryRequest,
-    current_user: dict = Depends(get_current_user),
+    current_tenant: dict = Depends(get_current_tenant),
 ):
     """
     Calculate income summary for Form 1040-NR.
@@ -237,7 +237,7 @@ def calculate_income_summary(
 @router.post("/withholding-credit", response_model=WithholdingCreditResponse)
 def calculate_withholding_credit(
     request: WithholdingCreditRequest,
-    current_user: dict = Depends(get_current_user),
+    current_tenant: dict = Depends(get_current_tenant),
 ):
     """
     Calculate withholding tax credits for Form 1040-NR.
@@ -281,7 +281,7 @@ def calculate_withholding_credit(
 @router.post("/penalty-calculator", response_model=PenaltyCalculatorResponse)
 def calculate_penalties(
     request: PenaltyCalculatorRequest,
-    current_user: dict = Depends(get_current_user),
+    current_tenant: dict = Depends(get_current_tenant),
 ):
     """
     Calculate late filing and payment penalties per §6072.
@@ -365,7 +365,7 @@ def calculate_penalties(
 @router.get("/overview", response_model=Form1040NROverview)
 def get_overview(
     tax_year: int,
-    current_user: dict = Depends(get_current_user),
+    current_tenant: dict = Depends(get_current_tenant),
 ):
     """
     Get overview of Form 1040-NR calculations for a tax year.
