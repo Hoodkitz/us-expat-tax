@@ -5,7 +5,6 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import List
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
 
 from app.models.form1040nr import (
     FilingRequirementRequest,

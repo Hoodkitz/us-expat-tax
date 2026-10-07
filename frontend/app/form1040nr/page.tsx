@@ -253,7 +253,7 @@ export default function Form1040NRPage() {
           id="tax_year"
           type="number"
           value={taxYear}
-          onChange={(e) => setTaxYear(parseInt(e.target.value))}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaxYear(parseInt(e.target.value))}
           className="w-40"
         />
       </div>
@@ -301,7 +301,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="number"
                     value={daysCurrentYear}
-                    onChange={(e) => setDaysCurrentYear(parseInt(e.target.value) || 0)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDaysCurrentYear(parseInt(e.target.value) || 0)}
                   />
                 </div>
                 <div>
@@ -309,7 +309,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="number"
                     value={daysPriorYear1}
-                    onChange={(e) => setDaysPriorYear1(parseInt(e.target.value) || 0)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDaysPriorYear1(parseInt(e.target.value) || 0)}
                   />
                 </div>
                 <div>
@@ -317,7 +317,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="number"
                     value={daysPriorYear2}
-                    onChange={(e) => setDaysPriorYear2(parseInt(e.target.value) || 0)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDaysPriorYear2(parseInt(e.target.value) || 0)}
                   />
                 </div>
               </div>
@@ -326,22 +326,22 @@ export default function Form1040NRPage() {
                 <Label>Treaty Country (optional)</Label>
                 <Input
                   value={treatyCountry}
-                  onChange={(e) => setTreatyCountry(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTreatyCountry(e.target.value)}
                   placeholder="z.B. Germany, India, China"
                 />
               </div>
 
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
-                  <Checkbox checked={isStudent} onCheckedChange={(c) => setIsStudent(c as boolean)} />
+                  <Checkbox checked={isStudent} onCheckedChange={(c: boolean) => setIsStudent(c)} />
                   <Label>Student</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Checkbox checked={isTeacher} onCheckedChange={(c) => setIsTeacher(c as boolean)} />
+                  <Checkbox checked={isTeacher} onCheckedChange={(c: boolean) => setIsTeacher(c)} />
                   <Label>Teacher</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Checkbox checked={hasUSIncome} onCheckedChange={(c) => setHasUSIncome(c as boolean)} />
+                  <Checkbox checked={hasUSIncome} onCheckedChange={(c: boolean) => setHasUSIncome(c)} />
                   <Label>US-Sourced Income</Label>
                 </div>
               </div>
@@ -351,7 +351,7 @@ export default function Form1040NRPage() {
                 <Input
                   type="number"
                   value={grossIncome}
-                  onChange={(e) => setGrossIncome(parseFloat(e.target.value) || 0)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGrossIncome(parseFloat(e.target.value) || 0)}
                 />
               </div>
 
@@ -424,11 +424,11 @@ export default function Form1040NRPage() {
                       <Input
                         placeholder="Beschreibung"
                         value={item.description}
-                        onChange={(e) => updateIncomeItem(index, "description", e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateIncomeItem(index, "description", e.target.value)}
                       />
                       <Select
                         value={item.income_type}
-                        onValueChange={(v) => updateIncomeItem(index, "income_type", v)}
+                        onValueChange={(v: string) => updateIncomeItem(index, "income_type", v)}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -445,7 +445,7 @@ export default function Form1040NRPage() {
                         type="number"
                         placeholder="Betrag"
                         value={item.gross_amount}
-                        onChange={(e) =>
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           updateIncomeItem(index, "gross_amount", parseFloat(e.target.value) || 0)
                         }
                       />
@@ -453,7 +453,7 @@ export default function Form1040NRPage() {
                         type="number"
                         placeholder="Withheld"
                         value={item.withheld_amount}
-                        onChange={(e) =>
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           updateIncomeItem(index, "withheld_amount", parseFloat(e.target.value) || 0)
                         }
                       />
@@ -462,14 +462,14 @@ export default function Form1040NRPage() {
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           checked={item.us_sourced}
-                          onCheckedChange={(c) => updateIncomeItem(index, "us_sourced", c)}
+                          onCheckedChange={(c: boolean) => updateIncomeItem(index, "us_sourced", c)}
                         />
                         <Label>US-Sourced</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           checked={item.treaty_exempt}
-                          onCheckedChange={(c) => updateIncomeItem(index, "treaty_exempt", c)}
+                          onCheckedChange={(c: boolean) => updateIncomeItem(index, "treaty_exempt", c)}
                         />
                         <Label>Treaty Exempt</Label>
                       </div>
@@ -489,7 +489,7 @@ export default function Form1040NRPage() {
                 <div className="flex items-center space-x-2 mb-4">
                   <Checkbox
                     checked={useStandardDeduction}
-                    onCheckedChange={(c) => setUseStandardDeduction(c as boolean)}
+                    onCheckedChange={(c: boolean) => setUseStandardDeduction(c)}
                   />
                   <Label>Standard Deduction verwenden ($14,600)</Label>
                 </div>
@@ -500,7 +500,7 @@ export default function Form1040NRPage() {
                     <Input
                       type="number"
                       value={itemizedDeductions}
-                      onChange={(e) => setItemizedDeductions(parseFloat(e.target.value) || 0)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemizedDeductions(parseFloat(e.target.value) || 0)}
                     />
                   </div>
                 )}
@@ -574,7 +574,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="number"
                     value={chapter3Withheld}
-                    onChange={(e) => setChapter3Withheld(parseFloat(e.target.value) || 0)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setChapter3Withheld(parseFloat(e.target.value) || 0)}
                   />
                 </div>
                 <div>
@@ -582,7 +582,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="number"
                     value={chapter4Withheld}
-                    onChange={(e) => setChapter4Withheld(parseFloat(e.target.value) || 0)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setChapter4Withheld(parseFloat(e.target.value) || 0)}
                   />
                 </div>
                 <div>
@@ -590,7 +590,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="number"
                     value={backupWithheld}
-                    onChange={(e) => setBackupWithheld(parseFloat(e.target.value) || 0)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBackupWithheld(parseFloat(e.target.value) || 0)}
                   />
                 </div>
                 <div>
@@ -598,7 +598,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="number"
                     value={estimatedTax}
-                    onChange={(e) => setEstimatedTax(parseFloat(e.target.value) || 0)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEstimatedTax(parseFloat(e.target.value) || 0)}
                   />
                 </div>
                 <div>
@@ -606,7 +606,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="number"
                     value={priorYearOverpayment}
-                    onChange={(e) => setPriorYearOverpayment(parseFloat(e.target.value) || 0)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPriorYearOverpayment(parseFloat(e.target.value) || 0)}
                   />
                 </div>
               </div>
@@ -664,7 +664,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="date"
                     value={filingDeadline}
-                    onChange={(e) => setFilingDeadline(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilingDeadline(e.target.value)}
                   />
                 </div>
                 <div>
@@ -672,7 +672,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="date"
                     value={actualFilingDate}
-                    onChange={(e) => setActualFilingDate(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setActualFilingDate(e.target.value)}
                   />
                 </div>
                 <div>
@@ -680,7 +680,7 @@ export default function Form1040NRPage() {
                   <Input
                     type="number"
                     value={taxOwed}
-                    onChange={(e) => setTaxOwed(parseFloat(e.target.value) || 0)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaxOwed(parseFloat(e.target.value) || 0)}
                   />
                 </div>
               </div>
@@ -689,14 +689,14 @@ export default function Form1040NRPage() {
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     checked={extensionFiled}
-                    onCheckedChange={(c) => setExtensionFiled(c as boolean)}
+                    onCheckedChange={(c: boolean) => setExtensionFiled(c)}
                   />
                   <Label>Extension Filed</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     checked={reasonableCause}
-                    onCheckedChange={(c) => setReasonableCause(c as boolean)}
+                    onCheckedChange={(c: boolean) => setReasonableCause(c)}
                   />
                   <Label>Reasonable Cause</Label>
                 </div>
