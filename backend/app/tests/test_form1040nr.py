@@ -40,7 +40,7 @@ class TestSubstantialPresenceTest:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["substantial_presence_days"] == "200.00"
+        assert data["substantial_presence_days"] == 200.0
         assert data["passes_substantial_presence_test"] is True
         assert data["resident_status"] == "resident"
     
