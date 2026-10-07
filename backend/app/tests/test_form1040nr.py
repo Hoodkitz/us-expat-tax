@@ -282,7 +282,7 @@ class TestFDAPvsECI:
         data = response.json()
         assert data["total_eci"] == "60000"
         # After standard deduction: 60000 - 14600 = 45400
-        assert data["taxable_eci"] == "45400.00"
+        assert data["taxable_eci"] == "45400"
         # Progressive tax on 45400
         assert float(data["total_tax_before_credits"]) > 0
         assert float(data["total_tax_before_credits"]) < 10000
