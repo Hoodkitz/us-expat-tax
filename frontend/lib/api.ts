@@ -881,3 +881,95 @@ export async function apiForm8843Overview(): Promise<Form8843Overview> {
   const res = await fetch(`${API_BASE}/api/v1/form8843/overview`);
   return handleResponse<Form8843Overview>(res);
 }
+
+// -----------------------------------------------------------------------
+// Form 8825 — Information Return by a U.S. Person with Respect to Certain Foreign Partnerships
+// -----------------------------------------------------------------------
+
+export interface FilingRequirement8825Request {
+  entity_type: "individual" | "corporation" | "partnership" | "trust" | "estate" | "llc";
+  ownership_percent: number;
+  us_owners: number;
+  foreign_corporation: "yes" | "no";
+  tax_year: number;
+}
+
+export interface FilingRequirement8825Result {
+  filing_required: boolean;
+  reasons: string[];
+  ownership_percent: number;
+  entity_type: string;
+  tax_year: number;
+  penalty_if_not_filed: number;
+  related_forms: string[];
+  recommendation: string;
+}
+
+export interface PenaltyCalculation8825Request {
+  entity_type: "individual" | "corporation" | "partnership" | "trust" | "estate" | "llc";
+  ownership_percent: number;
+  us_owners: number;
+  foreign_corporation: "yes" | "no";
+  tax_year: number;
+  is_general_partner: boolean;
+  violations_count: number;
+  days_unreported: number;
+}
+
+export interface PenaltyResult8825 {
+  base_penalty: number;
+  continued_failure_penalty: number;
+  total_penalty: number;
+  violations_count: number;
+  days_unreported: number;
+  is_general_partner: boolean;
+  explanation: string;
+}
+
+export interface Form8825Overview {
+  title: string;
+  description: string;
+  who_must_file: string[];
+  ownership_threshold: string;
+  control_threshold: string;
+  general_partner_rule: string;
+  penalties: string;
+  related_forms: string[];
+  filing_deadline: string;
+  recommendation: string;
+}
+
+export async function apiForm8825FilingRequirement(
+  payload: FilingRequirement8825Request
+): Promise<FilingRequirement8825Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8825/filing-requirement`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<FilingRequirement8825Result>(res);
+}
+
+export async function apiForm8825PenaltyCalculation(
+  payload: PenaltyCalculation8825Request
+): Promise<PenaltyResult8825> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8825/penalty-calculation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<PenaltyResult8825>(res);
+}
+
+export async function apiForm8825Overview(): Promise<Form8825Overview> {
+  const res = await fetch(`${API_BASE}/api/v1/form8825/overview`);
+  return handleResponse<Form8825Overview>(res);
+}
