@@ -100,10 +100,6 @@ async def check_filing_requirement(
     elif passes_spt:
         resident_status = ResidentStatus.RESIDENT
         treaty_exemption = False
-    elif request.days_in_us_current_year > 0 and request.days_in_us_current_year < 183:
-        # Dual-status if present part of year
-        resident_status = ResidentStatus.DUAL_STATUS
-        treaty_exemption = False
     else:
         resident_status = ResidentStatus.NON_RESIDENT
         treaty_exemption = False

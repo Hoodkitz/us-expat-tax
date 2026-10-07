@@ -98,7 +98,8 @@ class TestSubstantialPresenceTest:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["resident_status"] == "dual_status"
+        # 150 days alone doesn't pass SPT (need 183)
+        assert data["resident_status"] == "non_resident"
         assert data["passes_substantial_presence_test"] is False
 
 
