@@ -778,3 +778,106 @@ export async function apiForm8865Overview(): Promise<Form8865Overview> {
   });
   return handleResponse<Form8865Overview>(res);
 }
+
+// -----------------------------------------------------------------------
+// Form 8843 — Statement for Exempt Individuals
+// -----------------------------------------------------------------------
+
+export interface ExemptStatus8843Request {
+  us_days_present: number;
+  foreign_days_present: number;
+  tax_year: number;
+  visa_type: "F" | "J" | "M" | "Q" | "P" | "H" | "L" | "O" | "B" | "E" | "other";
+  is_student?: boolean;
+  is_teacher?: boolean;
+  is_trainee?: boolean;
+  is_researcher?: boolean;
+}
+
+export interface SubstantialPresence8843Request {
+  us_days_present: number;
+  prior_year_us_days: number;
+  two_years_ago_us_days: number;
+  tax_year: number;
+  is_exempt: boolean;
+}
+
+export interface ExemptStatus8843Result {
+  exempt_status: boolean;
+  days_counted: number;
+  substantial_presence_test: {
+    applies: boolean;
+    current_year_days: number;
+    prior_year_days_weighted: number;
+    two_years_ago_days_weighted: number;
+    total_days_counted: number;
+    threshold: number;
+    meets_threshold: boolean;
+    explanation: string;
+  };
+  required_forms: string[];
+  explanation: string;
+}
+
+export interface SubstantialPresence8843Result {
+  applies: boolean;
+  current_year_days: number;
+  prior_year_days_weighted: number;
+  two_years_ago_days_weighted: number;
+  total_days_counted: number;
+  threshold: number;
+  meets_threshold: boolean;
+  explanation: string;
+}
+
+export interface Form8843Overview {
+  form: string;
+  title: string;
+  purpose: string;
+  who_must_file: string[];
+  exempt_visa_types: string[];
+  substantial_presence_test: {
+    threshold_days: number;
+    min_current_year_days: number;
+    formula: string;
+    statutory_reference: string;
+  };
+  key_requirements: string[];
+  filing_deadline: string;
+  irs_reference: string;
+}
+
+export async function apiForm8843ExemptStatus(
+  payload: ExemptStatus8843Request
+): Promise<ExemptStatus8843Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8843/exempt-status`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<ExemptStatus8843Result>(res);
+}
+
+export async function apiForm8843SubstantialPresence(
+  payload: SubstantialPresence8843Request
+): Promise<SubstantialPresence8843Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8843/substantial-presence`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<SubstantialPresence8843Result>(res);
+}
+
+export async function apiForm8843Overview(): Promise<Form8843Overview> {
+  const res = await fetch(`${API_BASE}/api/v1/form8843/overview`);
+  return handleResponse<Form8843Overview>(res);
+}
