@@ -1056,7 +1056,7 @@ export default function Form3520APage() {
           <h2 className="text-lg font-semibold text-blue-900 mb-2">📋 About Form 3520-A</h2>
           <p className="text-sm text-blue-800 mb-3">
             Form 3520-A is filed by a foreign trust with a U.S. owner (or its U.S. agent) to report
-            information about the trust's operations, assets, and income.
+            information about the trust&apos;s operations, assets, and income.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800">
             <div>
