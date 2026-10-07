@@ -1,857 +1,667 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, FormEvent } from "react";
 import Link from "next/link";
-import { apiMe, TenantOut } from "@/lib/api";
 
-// -----------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // Types
-// -----------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 
-interface FilingRequirementResult {
-  filing_required: boolean;
-  reasons: string[];
-  recommendation: string;
-  total_us_income: number;
-  tax_withheld: number;
-  estimated_tax_due: number;
-}
-
-interface TaxCalculationResult {
+interface FilingRequirementRequest {
   tax_year: number;
-  filing_status: string;
-  total_income: number;
-  adjusted_gross_income: number;
-  total_deductions: number;
-  taxable_income: number;
-  tax_before_credits: number;
-  total_credits: number;
-  tax_after_credits: number;
-  federal_tax_withheld: number;
-  tax_due: number;
-  refund: number;
-  effective_tax_rate: number;
-  marginal_tax_rate: number;
-  income_breakdown: Record<string, number>;
-  tax_bracket_breakdown: Array<{
-    bracket_lower: number;
-    bracket_upper: number | null;
-    rate: number;
-    taxable_amount: number;
-    tax_amount: number;
-  }>;
-  treaty_applied: boolean;
-  treaty_rate: number | null;
+  days_in_us_current_year: number;
+  days_in_us_prior_year_1: number;
+  days_in_us_prior_year_2: number;
+  treaty_country?: string;
+  is_student: boolean;
+  is_teacher: boolean;
+  has_us_sourced_income: boolean;
+  gross_income: number;
 }
 
-interface OverviewData {
-  form_name: string;
-  form_title: string;
-  description: string;
+interface FilingRequirementResponse {
+  tax_year: number;
+  resident_status: string;
+  must_file: boolean;
+  substantial_presence_days: string;
+  passes_substantial_presence_test: boolean;
+  treaty_exemption_applies: boolean;
   filing_deadline: string;
-  who_must_file: string[];
-  income_types: string[];
-  tax_rates: Record<string, string>;
-  deductions_available: string[];
-  credits_available: string[];
-  special_rules: string[];
+  extension_deadline: string;
+  reasoning: string;
 }
 
-// -----------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------
-
-function fmtUSD(val: number | undefined): string {
-  if (val === undefined || val === null) return "–";
-  return new Intl.NumberFormat("de-DE", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(val);
+interface IncomeItem {
+  description: string;
+  income_type: string;
+  gross_amount: number;
+  us_sourced: boolean;
+  treaty_exempt: boolean;
+  treaty_article?: string;
+  withheld_amount: number;
 }
 
-function fmtPct(val: number | null | undefined): string {
-  if (val === undefined || val === null) return "–";
-  return `${(val * 100).toFixed(1)}%`;
+interface IncomeSummaryRequest {
+  tax_year: number;
+  income_items: IncomeItem[];
+  standard_deduction_claimed: boolean;
+  itemized_deductions: number;
 }
 
-// -----------------------------------------------------------------------
-// Main Page Component
-// -----------------------------------------------------------------------
+interface IncomeSummaryResponse {
+  tax_year: number;
+  total_eci: string;
+  total_fdap: string;
+  total_capital_gains: string;
+  total_us_sourced: string;
+  total_foreign_sourced: string;
+  total_treaty_exempt: string;
+  taxable_eci: string;
+  taxable_fdap: string;
+  standard_deduction: string;
+  itemized_deductions: string;
+  total_tax_before_credits: string;
+  effective_rate: string;
+}
+
+interface WithholdingCreditRequest {
+  tax_year: number;
+  chapter_3_withheld: number;
+  chapter_4_withheld: number;
+  backup_withheld: number;
+  estimated_tax_paid: number;
+  prior_year_overpayment: number;
+}
+
+interface WithholdingCreditResponse {
+  tax_year: number;
+  total_chapter_3_credit: string;
+  total_chapter_4_credit: string;
+  total_backup_credit: string;
+  total_estimated_tax: string;
+  total_credits: string;
+  refundable_amount: string;
+  non_refundable_amount: string;
+}
+
+interface PenaltyCalculatorRequest {
+  tax_year: number;
+  filing_deadline: string;
+  actual_filing_date?: string;
+  tax_owed: number;
+  was_extension_filed: boolean;
+  reasonable_cause: boolean;
+}
+
+interface PenaltyCalculatorResponse {
+  tax_year: number;
+  days_late: number;
+  late_filing_penalty: string;
+  late_payment_penalty: string;
+  interest_charges: string;
+  total_penalties: string;
+  minimum_penalty_applies: boolean;
+  minimum_penalty_amount: string;
+  waived_due_to_reasonable_cause: boolean;
+  total_amount_due: string;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export default function Form1040NRPage() {
-  const router = useRouter();
-  const [tenant, setTenant] = useState<TenantOut | null>(null);
-  const [authError, setAuthError] = useState(false);
-  const [activeTab, setActiveTab] = useState<"filing" | "calculate" | "overview">("filing");
+  const [taxYear, setTaxYear] = useState<number>(2024);
+  const [activeTab, setActiveTab] = useState<string>("filing");
 
-  // Overview state
-  const [overview, setOverview] = useState<OverviewData | null>(null);
+  // Filing Requirement
+  const [daysCurrentYear, setDaysCurrentYear] = useState<number>(0);
+  const [daysPriorYear1, setDaysPriorYear1] = useState<number>(0);
+  const [daysPriorYear2, setDaysPriorYear2] = useState<number>(0);
+  const [treatyCountry, setTreatyCountry] = useState<string>("");
+  const [isStudent, setIsStudent] = useState<boolean>(false);
+  const [isTeacher, setIsTeacher] = useState<boolean>(false);
+  const [hasUSIncome, setHasUSIncome] = useState<boolean>(false);
+  const [grossIncome, setGrossIncome] = useState<number>(0);
+  const [filingResult, setFilingResult] = useState<FilingRequirementResponse | null>(null);
 
-  // Filing requirement state
-  const [filingTaxYear, setFilingTaxYear] = useState(2024);
-  const [usSourceIncome, setUsSourceIncome] = useState(0);
-  const [eciIncome, setEciIncome] = useState(0);
-  const [fdapIncome, setFdapIncome] = useState(0);
-  const [taxWithheld, setTaxWithheld] = useState(0);
-  const [isTreatyResident, setIsTreatyResident] = useState(false);
-  const [treatyRate, setTreatyRate] = useState<number | undefined>(undefined);
-  const [filingResult, setFilingResult] = useState<FilingRequirementResult | null>(null);
+  // Income Summary
+  const [incomeItems, setIncomeItems] = useState<IncomeItem[]>([]);
+  const [useStdDeduction, setUseStdDeduction] = useState<boolean>(true);
+  const [itemizedDed, setItemizedDed] = useState<number>(0);
+  const [incomeResult, setIncomeResult] = useState<IncomeSummaryResponse | null>(null);
 
-  // Tax calculation state
-  const [calcTaxYear, setCalcTaxYear] = useState(2024);
-  const [filingStatus, setFilingStatus] = useState("Single");
-  const [wages, setWages] = useState(0);
-  const [interestIncome, setInterestIncome] = useState(0);
-  const [dividendIncome, setDividendIncome] = useState(0);
-  const [capitalGains, setCapitalGains] = useState(0);
-  const [businessIncome, setBusinessIncome] = useState(0);
-  const [rentalIncome, setRentalIncome] = useState(0);
-  const [otherIncome, setOtherIncome] = useState(0);
-  const [itemizedDeductions, setItemizedDeductions] = useState(0);
-  const [studentLoanInterest, setStudentLoanInterest] = useState(0);
-  const [iraDeduction, setIraDeduction] = useState(0);
-  const [foreignTaxCredit, setForeignTaxCredit] = useState(0);
-  const [childTaxCredit, setChildTaxCredit] = useState(0);
-  const [otherCredits, setOtherCredits] = useState(0);
-  const [federalTaxWithheld, setFederalTaxWithheld] = useState(0);
-  const [calcTreatyResident, setCalcTreatyResident] = useState(false);
-  const [calcTreatyRate, setCalcTreatyRate] = useState<number | undefined>(undefined);
-  const [calcResult, setCalcResult] = useState<TaxCalculationResult | null>(null);
+  // Withholding
+  const [ch3, setCh3] = useState<number>(0);
+  const [ch4, setCh4] = useState<number>(0);
+  const [backup, setBackup] = useState<number>(0);
+  const [est, setEst] = useState<number>(0);
+  const [overpay, setOverpay] = useState<number>(0);
+  const [whtResult, setWhtResult] = useState<WithholdingCreditResponse | null>(null);
 
-  // UI state
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Penalty
+  const [filingDL, setFilingDL] = useState<string>("");
+  const [actualFD, setActualFD] = useState<string>("");
+  const [taxOwed, setTaxOwed] = useState<number>(0);
+  const [ext, setExt] = useState<boolean>(false);
+  const [rc, setRc] = useState<boolean>(false);
+  const [penResult, setPenResult] = useState<PenaltyCalculatorResponse | null>(null);
 
-  // ---- Auth guard ----
-  useEffect(() => {
-    const token = localStorage.getItem("jwt_token");
-    if (!token) {
-      router.replace("/auth/login");
-      return;
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+
+  const apiCall = async (endpoint: string, data: any): Promise<any> => {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`http://localhost:8000/api/v1/form1040nr/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "API error");
     }
-    apiMe()
-      .then(setTenant)
-      .catch(() => {
-        localStorage.removeItem("jwt_token");
-        setAuthError(true);
-        router.replace("/auth/login");
-      });
-  }, [router]);
+    return res.json();
+  };
 
-  // ---- Load overview ----
-  useEffect(() => {
-    const token = localStorage.getItem("jwt_token");
-    if (!token) return;
-    fetch("/api/v1/form1040nr/overview", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setOverview(data))
-      .catch(() => {});
-  }, []);
-
-  // ---- Filing Check Handler ----
-  const handleFilingCheck = async () => {
+  const checkFiling = async (e: FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-    setError(null);
-    setFilingResult(null);
+    setError("");
     try {
-      const token = localStorage.getItem("jwt_token");
-      const res = await fetch("/api/v1/form1040nr/filing-requirement", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          tax_year: filingTaxYear,
-          us_source_income: usSourceIncome,
-          effectively_connected_income: eciIncome,
-          fdap_income: fdapIncome,
-          tax_withheld: taxWithheld,
-          is_treaty_country_resident: isTreatyResident,
-          treaty_reduced_rate: treatyRate,
-        }),
+      const result = await apiCall("filing-requirement", {
+        tax_year: taxYear,
+        days_in_us_current_year: daysCurrentYear,
+        days_in_us_prior_year_1: daysPriorYear1,
+        days_in_us_prior_year_2: daysPriorYear2,
+        treaty_country: treatyCountry || undefined,
+        is_student: isStudent,
+        is_teacher: isTeacher,
+        has_us_sourced_income: hasUSIncome,
+        gross_income: grossIncome,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Fehler");
-      setFilingResult(data);
+      setFilingResult(result);
     } catch (err: any) {
-      setError(err.message || "Unbekannter Fehler");
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // ---- Tax Calculation Handler ----
-  const handleCalculate = async () => {
+  const calcIncome = async (e: FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-    setError(null);
-    setCalcResult(null);
+    setError("");
     try {
-      const token = localStorage.getItem("jwt_token");
-      const res = await fetch("/api/v1/form1040nr/calculate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          tax_year: calcTaxYear,
-          filing_status: filingStatus,
-          wages_salaries: wages,
-          interest_income: interestIncome,
-          dividend_income: dividendIncome,
-          capital_gains: capitalGains,
-          business_income: businessIncome,
-          rental_income: rentalIncome,
-          other_income: otherIncome,
-          itemized_deductions: itemizedDeductions,
-          student_loan_interest: studentLoanInterest,
-          ira_deduction: iraDeduction,
-          foreign_tax_credit: foreignTaxCredit,
-          child_tax_credit: childTaxCredit,
-          other_credits: otherCredits,
-          federal_tax_withheld: federalTaxWithheld,
-          is_treaty_country_resident: calcTreatyResident,
-          treaty_reduced_rate: calcTreatyRate,
-        }),
+      const result = await apiCall("income-summary", {
+        tax_year: taxYear,
+        income_items: incomeItems,
+        standard_deduction_claimed: useStdDeduction,
+        itemized_deductions: itemizedDed,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Fehler");
-      setCalcResult(data);
+      setIncomeResult(result);
     } catch (err: any) {
-      setError(err.message || "Unbekannter Fehler");
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  if (authError) return null;
+  const calcWht = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const result = await apiCall("withholding-credit", {
+        tax_year: taxYear,
+        chapter_3_withheld: ch3,
+        chapter_4_withheld: ch4,
+        backup_withheld: backup,
+        estimated_tax_paid: est,
+        prior_year_overpayment: overpay,
+      });
+      setWhtResult(result);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calcPen = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const result = await apiCall("penalty-calculator", {
+        tax_year: taxYear,
+        filing_deadline: filingDL,
+        actual_filing_date: actualFD || undefined,
+        tax_owed: taxOwed,
+        was_extension_filed: ext,
+        reasonable_cause: rc,
+      });
+      setPenResult(result);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addIncome = () => {
+    setIncomeItems([
+      ...incomeItems,
+      {
+        description: "",
+        income_type: "eci",
+        gross_amount: 0,
+        us_sourced: true,
+        treaty_exempt: false,
+        withheld_amount: 0,
+      },
+    ]);
+  };
+
+  const updateIncome = (idx: number, field: string, value: any) => {
+    const u = [...incomeItems];
+    u[idx] = { ...u[idx], [field]: value };
+    setIncomeItems(u);
+  };
+
+  const removeIncome = (idx: number) => {
+    setIncomeItems(incomeItems.filter((_, i) => i !== idx));
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="text-4xl">📄</div>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">Form 1040-NR</h1>
-                <p className="text-slate-600">U.S. Nonresident Alien Income Tax Return</p>
-              </div>
+    <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
+      <h1 style={{ fontSize: "2rem", fontWeight: "bold", marginBottom: "0.5rem" }}>
+        Form 1040-NR
+      </h1>
+      <p style={{ marginBottom: "1.5rem", color: "#666" }}>
+        Non-Resident Alien Tax Return - Resident-Status-Test, US-Sourced Income, Chapter 3/4 WHT
+      </p>
+
+      <div style={{ marginBottom: "1.5rem" }}>
+        <label>
+          <strong>Steuerjahr:</strong>
+          <input
+            type="number"
+            value={taxYear}
+            onChange={(e) => setTaxYear(parseInt(e.target.value) || 2024)}
+            style={{ marginLeft: "0.5rem", padding: "0.25rem" }}
+          />
+        </label>
+      </div>
+
+      {error && <div style={{ color: "red", marginBottom: "1rem" }}>{error}</div>}
+
+      <div style={{ borderBottom: "1px solid #ccc", marginBottom: "1rem" }}>
+        <button
+          onClick={() => setActiveTab("filing")}
+          style={{
+            padding: "0.5rem 1rem",
+            background: activeTab === "filing" ? "#007bff" : "transparent",
+            color: activeTab === "filing" ? "#fff" : "#000",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          Filing Requirement
+        </button>
+        <button
+          onClick={() => setActiveTab("income")}
+          style={{
+            padding: "0.5rem 1rem",
+            background: activeTab === "income" ? "#007bff" : "transparent",
+            color: activeTab === "income" ? "#fff" : "#000",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          Income Summary
+        </button>
+        <button
+          onClick={() => setActiveTab("wht")}
+          style={{
+            padding: "0.5rem 1rem",
+            background: activeTab === "wht" ? "#007bff" : "transparent",
+            color: activeTab === "wht" ? "#fff" : "#000",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          Withholding
+        </button>
+        <button
+          onClick={() => setActiveTab("penalty")}
+          style={{
+            padding: "0.5rem 1rem",
+            background: activeTab === "penalty" ? "#007bff" : "transparent",
+            color: activeTab === "penalty" ? "#fff" : "#000",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          Penalties
+        </button>
+      </div>
+
+      {activeTab === "filing" && (
+        <div>
+          <h2>Filing Requirement Test</h2>
+          <form onSubmit={checkFiling}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <label>
+                Tage in USA (aktuell):
+                <input
+                  type="number"
+                  value={daysCurrentYear}
+                  onChange={(e) => setDaysCurrentYear(parseInt(e.target.value) || 0)}
+                  style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+                />
+              </label>
+              <label>
+                Tage in USA (Vorjahr 1):
+                <input
+                  type="number"
+                  value={daysPriorYear1}
+                  onChange={(e) => setDaysPriorYear1(parseInt(e.target.value) || 0)}
+                  style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+                />
+              </label>
+              <label>
+                Tage in USA (Vorjahr 2):
+                <input
+                  type="number"
+                  value={daysPriorYear2}
+                  onChange={(e) => setDaysPriorYear2(parseInt(e.target.value) || 0)}
+                  style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+                />
+              </label>
             </div>
-            <Link href="/" className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition">
-              ← Dashboard
-            </Link>
-          </div>
-          {overview && (
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-slate-700">{overview.description}</p>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              Treaty Country:
+              <input
+                type="text"
+                value={treatyCountry}
+                onChange={(e) => setTreatyCountry(e.target.value)}
+                style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+              />
+            </label>
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ marginRight: "1rem" }}>
+                <input type="checkbox" checked={isStudent} onChange={(e) => setIsStudent(e.target.checked)} />
+                Student
+              </label>
+              <label style={{ marginRight: "1rem" }}>
+                <input type="checkbox" checked={isTeacher} onChange={(e) => setIsTeacher(e.target.checked)} />
+                Teacher
+              </label>
+              <label>
+                <input type="checkbox" checked={hasUSIncome} onChange={(e) => setHasUSIncome(e.target.checked)} />
+                US-Sourced Income
+              </label>
+            </div>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              Gross Income:
+              <input
+                type="number"
+                value={grossIncome}
+                onChange={(e) => setGrossIncome(parseFloat(e.target.value) || 0)}
+                style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+              />
+            </label>
+            <button type="submit" disabled={loading} style={{ padding: "0.5rem 1rem", background: "#007bff", color: "#fff", border: "none", cursor: "pointer" }}>
+              {loading ? "Prüfe..." : "Berechnen"}
+            </button>
+          </form>
+
+          {filingResult && (
+            <div style={{ marginTop: "1.5rem", padding: "1rem", background: "#f0f0f0", borderRadius: "4px" }}>
+              <h3>Ergebnis</h3>
+              <p><strong>Must File:</strong> {filingResult.must_file ? "YES" : "NO"}</p>
+              <p><strong>Resident Status:</strong> {filingResult.resident_status}</p>
+              <p><strong>SPT Days:</strong> {filingResult.substantial_presence_days}</p>
+              <p><strong>Passes SPT:</strong> {filingResult.passes_substantial_presence_test ? "Yes" : "No"}</p>
+              <p><strong>Treaty Exemption:</strong> {filingResult.treaty_exemption_applies ? "Yes" : "No"}</p>
+              <p><strong>Filing Deadline:</strong> {filingResult.filing_deadline}</p>
+              <p><strong>Extension Deadline:</strong> {filingResult.extension_deadline}</p>
+              <p><strong>Reasoning:</strong> {filingResult.reasoning}</p>
             </div>
           )}
         </div>
+      )}
 
-        {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-lg mb-6">
-          <div className="flex border-b border-slate-200">
-            <button
-              onClick={() => setActiveTab("filing")}
-              className={`flex-1 py-4 px-6 text-center font-semibold transition ${
-                activeTab === "filing"
-                  ? "bg-blue-600 text-white rounded-t-xl"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              Filing Check
-            </button>
-            <button
-              onClick={() => setActiveTab("calculate")}
-              className={`flex-1 py-4 px-6 text-center font-semibold transition ${
-                activeTab === "calculate"
-                  ? "bg-blue-600 text-white rounded-t-xl"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              Tax Calculation
-            </button>
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`flex-1 py-4 px-6 text-center font-semibold transition ${
-                activeTab === "overview"
-                  ? "bg-blue-600 text-white rounded-t-xl"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              Overview
-            </button>
-          </div>
-
-          {/* Tab Content */}
-          <div className="p-6">
-            {/* ---- Filing Check Tab ---- */}
-            {activeTab === "filing" && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-slate-900">Filing Requirement Check</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Tax Year</label>
-                    <input
-                      type="number"
-                      value={filingTaxYear}
-                      onChange={(e) => setFilingTaxYear(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">US Source Income (USD)</label>
-                    <input
-                      type="number"
-                      value={usSourceIncome}
-                      onChange={(e) => setUsSourceIncome(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Effectively Connected Income (USD)</label>
-                    <input
-                      type="number"
-                      value={eciIncome}
-                      onChange={(e) => setEciIncome(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">FDAP Income (USD)</label>
-                    <input
-                      type="number"
-                      value={fdapIncome}
-                      onChange={(e) => setFdapIncome(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Tax Withheld (USD)</label>
-                    <input
-                      type="number"
-                      value={taxWithheld}
-                      onChange={(e) => setTaxWithheld(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      min="0"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={isTreatyResident}
-                      onChange={(e) => setIsTreatyResident(e.target.checked)}
-                      className="h-5 w-5"
-                    />
-                    <label className="text-sm font-medium text-slate-700">Treaty Country Resident</label>
-                  </div>
-                  {isTreatyResident && (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Treaty Rate (optional)</label>
-                      <input
-                        type="number"
-                        value={treatyRate || ""}
-                        onChange={(e) => setTreatyRate(e.target.value ? Number(e.target.value) : undefined)}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        placeholder="z.B. 0.15 für 15%"
-                      />
-                    </div>
-                  )}
+      {activeTab === "income" && (
+        <div>
+          <h2>Income Summary (ECI vs FDAP)</h2>
+          <form onSubmit={calcIncome}>
+            <div style={{ marginBottom: "1rem" }}>
+              {incomeItems.map((item, idx) => (
+                <div key={idx} style={{ border: "1px solid #ccc", padding: "0.5rem", marginBottom: "0.5rem" }}>
+                  <input
+                    placeholder="Description"
+                    value={item.description}
+                    onChange={(e) => updateIncome(idx, "description", e.target.value)}
+                    style={{ width: "100%", padding: "0.25rem", marginBottom: "0.25rem" }}
+                  />
+                  <select
+                    value={item.income_type}
+                    onChange={(e) => updateIncome(idx, "income_type", e.target.value)}
+                    style={{ width: "100%", padding: "0.25rem", marginBottom: "0.25rem" }}
+                  >
+                    <option value="eci">ECI</option>
+                    <option value="fdap">FDAP</option>
+                    <option value="capital_gains">Capital Gains</option>
+                    <option value="rental">Rental</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <input
+                    type="number"
+                    placeholder="Amount"
+                    value={item.gross_amount}
+                    onChange={(e) => updateIncome(idx, "gross_amount", parseFloat(e.target.value) || 0)}
+                    style={{ width: "100%", padding: "0.25rem", marginBottom: "0.25rem" }}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Withheld"
+                    value={item.withheld_amount}
+                    onChange={(e) => updateIncome(idx, "withheld_amount", parseFloat(e.target.value) || 0)}
+                    style={{ width: "100%", padding: "0.25rem", marginBottom: "0.25rem" }}
+                  />
+                  <label style={{ marginRight: "1rem" }}>
+                    <input type="checkbox" checked={item.us_sourced} onChange={(e) => updateIncome(idx, "us_sourced", e.target.checked)} />
+                    US-Sourced
+                  </label>
+                  <label style={{ marginRight: "1rem" }}>
+                    <input type="checkbox" checked={item.treaty_exempt} onChange={(e) => updateIncome(idx, "treaty_exempt", e.target.checked)} />
+                    Treaty Exempt
+                  </label>
+                  <button type="button" onClick={() => removeIncome(idx)} style={{ padding: "0.25rem 0.5rem", background: "red", color: "#fff", border: "none" }}>
+                    Remove
+                  </button>
                 </div>
+              ))}
+              <button type="button" onClick={addIncome} style={{ padding: "0.5rem 1rem", background: "#28a745", color: "#fff", border: "none", cursor: "pointer" }}>
+                + Add Income Item
+              </button>
+            </div>
 
-                <button
-                  onClick={handleFilingCheck}
-                  disabled={loading}
-                  className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-slate-400"
-                >
-                  {loading ? "Calculating..." : "Check Filing Requirement"}
-                </button>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              <input type="checkbox" checked={useStdDeduction} onChange={(e) => setUseStdDeduction(e.target.checked)} />
+              Standard Deduction ($14,600)
+            </label>
 
-                {error && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-800 font-semibold">Error:</p>
-                    <p className="text-red-700">{error}</p>
-                  </div>
-                )}
-
-                {filingResult && (
-                  <div className="p-6 bg-white border-2 border-blue-200 rounded-lg">
-                    <h3 className="text-xl font-bold text-slate-900 mb-4">Filing Requirement Result</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <p className="text-sm text-slate-600">Filing Required</p>
-                        <p className={`text-2xl font-bold ${filingResult.filing_required ? "text-red-600" : "text-green-600"}`}>
-                          {filingResult.filing_required ? "YES" : "NO"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600">Total US Income</p>
-                        <p className="text-lg font-semibold text-slate-900">{fmtUSD(filingResult.total_us_income)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600">Tax Withheld</p>
-                        <p className="text-lg font-semibold text-slate-900">{fmtUSD(filingResult.tax_withheld)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-600">Estimated Tax Due</p>
-                        <p className="text-lg font-semibold text-red-600">{fmtUSD(filingResult.estimated_tax_due)}</p>
-                      </div>
-                    </div>
-                    <div className="mb-4">
-                      <p className="text-sm font-semibold text-slate-700 mb-2">Reasons:</p>
-                      <ul className="list-disc list-inside space-y-1">
-                        {filingResult.reasons.map((r, i) => (
-                          <li key={i} className="text-sm text-slate-700">{r}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <p className="text-sm font-semibold text-slate-700 mb-1">Recommendation:</p>
-                      <p className="text-sm text-slate-700">{filingResult.recommendation}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+            {!useStdDeduction && (
+              <label style={{ marginBottom: "1rem", display: "block" }}>
+                Itemized Deductions:
+                <input
+                  type="number"
+                  value={itemizedDed}
+                  onChange={(e) => setItemizedDed(parseFloat(e.target.value) || 0)}
+                  style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+                />
+              </label>
             )}
 
-            {/* ---- Tax Calculation Tab ---- */}
-            {activeTab === "calculate" && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-slate-900">Tax Calculation</h2>
+            <button type="submit" disabled={loading || incomeItems.length === 0} style={{ padding: "0.5rem 1rem", background: "#007bff", color: "#fff", border: "none", cursor: "pointer" }}>
+              {loading ? "Berechne..." : "Berechnen"}
+            </button>
+          </form>
 
-                {/* Filing Status */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Tax Year</label>
-                    <input
-                      type="number"
-                      value={calcTaxYear}
-                      onChange={(e) => setCalcTaxYear(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Filing Status</label>
-                    <select
-                      value={filingStatus}
-                      onChange={(e) => setFilingStatus(e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    >
-                      <option value="Single">Single</option>
-                      <option value="Married Filing Jointly">Married Filing Jointly</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Income Section */}
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-3">Income</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Wages, Salaries (USD)</label>
-                      <input
-                        type="number"
-                        value={wages}
-                        onChange={(e) => setWages(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Interest Income (USD)</label>
-                      <input
-                        type="number"
-                        value={interestIncome}
-                        onChange={(e) => setInterestIncome(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Dividend Income (USD)</label>
-                      <input
-                        type="number"
-                        value={dividendIncome}
-                        onChange={(e) => setDividendIncome(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Capital Gains (USD)</label>
-                      <input
-                        type="number"
-                        value={capitalGains}
-                        onChange={(e) => setCapitalGains(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Business Income (USD)</label>
-                      <input
-                        type="number"
-                        value={businessIncome}
-                        onChange={(e) => setBusinessIncome(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Rental Income (USD)</label>
-                      <input
-                        type="number"
-                        value={rentalIncome}
-                        onChange={(e) => setRentalIncome(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Other Income (USD)</label>
-                      <input
-                        type="number"
-                        value={otherIncome}
-                        onChange={(e) => setOtherIncome(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Deductions Section */}
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-3">Deductions</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Itemized Deductions (USD)</label>
-                      <input
-                        type="number"
-                        value={itemizedDeductions}
-                        onChange={(e) => setItemizedDeductions(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Student Loan Interest (USD)</label>
-                      <input
-                        type="number"
-                        value={studentLoanInterest}
-                        onChange={(e) => setStudentLoanInterest(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">IRA Deduction (USD)</label>
-                      <input
-                        type="number"
-                        value={iraDeduction}
-                        onChange={(e) => setIraDeduction(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Credits Section */}
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-3">Tax Credits</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Foreign Tax Credit (USD)</label>
-                      <input
-                        type="number"
-                        value={foreignTaxCredit}
-                        onChange={(e) => setForeignTaxCredit(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Child Tax Credit (USD)</label>
-                      <input
-                        type="number"
-                        value={childTaxCredit}
-                        onChange={(e) => setChildTaxCredit(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Other Credits (USD)</label>
-                      <input
-                        type="number"
-                        value={otherCredits}
-                        onChange={(e) => setOtherCredits(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Withholding & Treaty */}
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-3">Withholding & Treaty</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Federal Tax Withheld (USD)</label>
-                      <input
-                        type="number"
-                        value={federalTaxWithheld}
-                        onChange={(e) => setFederalTaxWithheld(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={calcTreatyResident}
-                        onChange={(e) => setCalcTreatyResident(e.target.checked)}
-                        className="h-5 w-5"
-                      />
-                      <label className="text-sm font-medium text-slate-700">Treaty Country Resident</label>
-                    </div>
-                    {calcTreatyResident && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Treaty Rate (optional)</label>
-                        <input
-                          type="number"
-                          value={calcTreatyRate || ""}
-                          onChange={(e) => setCalcTreatyRate(e.target.value ? Number(e.target.value) : undefined)}
-                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                          min="0"
-                          max="1"
-                          step="0.01"
-                          placeholder="z.B. 0.15 für 15%"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleCalculate}
-                  disabled={loading}
-                  className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-slate-400"
-                >
-                  {loading ? "Calculating..." : "Calculate Tax"}
-                </button>
-
-                {error && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-800 font-semibold">Error:</p>
-                    <p className="text-red-700">{error}</p>
-                  </div>
-                )}
-
-                {calcResult && (
-                  <div className="p-6 bg-white border-2 border-blue-200 rounded-lg space-y-6">
-                    <h3 className="text-xl font-bold text-slate-900">Tax Calculation Result</h3>
-
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-4 bg-slate-50 rounded-lg">
-                        <p className="text-sm text-slate-600">Total Income</p>
-                        <p className="text-2xl font-bold text-slate-900">{fmtUSD(calcResult.total_income)}</p>
-                      </div>
-                      <div className="p-4 bg-slate-50 rounded-lg">
-                        <p className="text-sm text-slate-600">Taxable Income</p>
-                        <p className="text-2xl font-bold text-slate-900">{fmtUSD(calcResult.taxable_income)}</p>
-                      </div>
-                      <div className="p-4 bg-slate-50 rounded-lg">
-                        <p className="text-sm text-slate-600">Effective Tax Rate</p>
-                        <p className="text-2xl font-bold text-slate-900">{calcResult.effective_tax_rate.toFixed(1)}%</p>
-                      </div>
-                    </div>
-
-                    {/* Tax Breakdown */}
-                    <div>
-                      <h4 className="text-lg font-semibold text-slate-900 mb-3">Tax Breakdown</h4>
-                      <div className="space-y-2">
-                        <div className="flex justify-between py-2 border-b border-slate-200">
-                          <span className="text-slate-600">Tax Before Credits</span>
-                          <span className="font-semibold text-slate-900">{fmtUSD(calcResult.tax_before_credits)}</span>
-                        </div>
-                        <div className="flex justify-between py-2 border-b border-slate-200">
-                          <span className="text-slate-600">Total Credits</span>
-                          <span className="font-semibold text-green-600">-{fmtUSD(calcResult.total_credits)}</span>
-                        </div>
-                        <div className="flex justify-between py-2 border-b border-slate-200">
-                          <span className="text-slate-600">Tax After Credits</span>
-                          <span className="font-semibold text-slate-900">{fmtUSD(calcResult.tax_after_credits)}</span>
-                        </div>
-                        <div className="flex justify-between py-2 border-b border-slate-200">
-                          <span className="text-slate-600">Federal Tax Withheld</span>
-                          <span className="font-semibold text-slate-900">{fmtUSD(calcResult.federal_tax_withheld)}</span>
-                        </div>
-                        <div className="flex justify-between py-2 border-b border-slate-200">
-                          <span className="text-slate-600">Marginal Tax Rate</span>
-                          <span className="font-semibold text-slate-900">{fmtPct(calcResult.marginal_tax_rate)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Result */}
-                    <div className={`p-4 rounded-lg ${calcResult.tax_due > 0 ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"}`}>
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold text-slate-900">
-                          {calcResult.tax_due > 0 ? "Tax Due" : "Refund"}
-                        </span>
-                        <span className={`text-2xl font-bold ${calcResult.tax_due > 0 ? "text-red-600" : "text-green-600"}`}>
-                          {fmtUSD(calcResult.tax_due > 0 ? calcResult.tax_due : calcResult.refund)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Income Breakdown */}
-                    <div>
-                      <h4 className="text-lg font-semibold text-slate-900 mb-3">Income Breakdown</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {Object.entries(calcResult.income_breakdown).map(([key, value]) => (
-                          <div key={key} className="p-2 bg-slate-50 rounded">
-                            <p className="text-xs text-slate-500 capitalize">{key.replace(/_/g, " ")}</p>
-                            <p className="text-sm font-semibold text-slate-900">{fmtUSD(value)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Tax Bracket Breakdown */}
-                    {calcResult.tax_bracket_breakdown.length > 0 && (
-                      <div>
-                        <h4 className="text-lg font-semibold text-slate-900 mb-3">Tax Bracket Breakdown</h4>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-slate-200">
-                                <th className="text-left py-2 text-slate-600">Bracket</th>
-                                <th className="text-right py-2 text-slate-600">Rate</th>
-                                <th className="text-right py-2 text-slate-600">Taxable Amount</th>
-                                <th className="text-right py-2 text-slate-600">Tax</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {calcResult.tax_bracket_breakdown.map((bracket, i) => (
-                                <tr key={i} className="border-b border-slate-100">
-                                  <td className="py-2 text-slate-900">
-                                    {fmtUSD(bracket.bracket_lower)} - {bracket.bracket_upper ? fmtUSD(bracket.bracket_upper) : "∞"}
-                                  </td>
-                                  <td className="py-2 text-right text-slate-900">{fmtPct(bracket.rate)}</td>
-                                  <td className="py-2 text-right text-slate-900">{fmtUSD(bracket.taxable_amount)}</td>
-                                  <td className="py-2 text-right text-slate-900">{fmtUSD(bracket.tax_amount)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Treaty Info */}
-                    {calcResult.treaty_applied && (
-                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm font-semibold text-blue-800">Treaty Applied</p>
-                        <p className="text-sm text-blue-700">Reduced rate: {fmtPct(calcResult.treaty_rate)}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ---- Overview Tab ---- */}
-            {activeTab === "overview" && overview && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-slate-900">Form 1040-NR Overview</h2>
-
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-sm text-slate-700">{overview.description}</p>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Filing Deadline</h3>
-                  <p className="text-slate-700">{overview.filing_deadline}</p>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Who Must File</h3>
-                  <ul className="list-disc list-inside space-y-1">
-                    {overview.who_must_file.map((item, i) => (
-                      <li key={i} className="text-sm text-slate-700">{item}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Income Types</h3>
-                  <ul className="list-disc list-inside space-y-1">
-                    {overview.income_types.map((item, i) => (
-                      <li key={i} className="text-sm text-slate-700">{item}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Tax Rates</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {Object.entries(overview.tax_rates).map(([key, value]) => (
-                      <div key={key} className="p-3 bg-slate-50 rounded-lg">
-                        <p className="text-sm font-semibold text-slate-900">{key}</p>
-                        <p className="text-sm text-slate-600">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Deductions Available</h3>
-                  <ul className="list-disc list-inside space-y-1">
-                    {overview.deductions_available.map((item, i) => (
-                      <li key={i} className="text-sm text-slate-700">{item}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Credits Available</h3>
-                  <ul className="list-disc list-inside space-y-1">
-                    {overview.credits_available.map((item, i) => (
-                      <li key={i} className="text-sm text-slate-700">{item}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Special Rules</h3>
-                  <ul className="list-disc list-inside space-y-1">
-                    {overview.special_rules.map((item, i) => (
-                      <li key={i} className="text-sm text-slate-700">{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-          </div>
+          {incomeResult && (
+            <div style={{ marginTop: "1.5rem", padding: "1rem", background: "#f0f0f0", borderRadius: "4px" }}>
+              <h3>Ergebnis</h3>
+              <p><strong>Total ECI:</strong> ${incomeResult.total_eci}</p>
+              <p><strong>Total FDAP:</strong> ${incomeResult.total_fdap}</p>
+              <p><strong>Capital Gains:</strong> ${incomeResult.total_capital_gains}</p>
+              <p><strong>US-Sourced:</strong> ${incomeResult.total_us_sourced}</p>
+              <p><strong>Foreign-Sourced:</strong> ${incomeResult.total_foreign_sourced}</p>
+              <p><strong>Treaty Exempt:</strong> ${incomeResult.total_treaty_exempt}</p>
+              <p><strong>Taxable ECI:</strong> ${incomeResult.taxable_eci}</p>
+              <p><strong>Taxable FDAP:</strong> ${incomeResult.taxable_fdap}</p>
+              <p><strong>Total Tax:</strong> ${incomeResult.total_tax_before_credits}</p>
+              <p><strong>Effective Rate:</strong> {incomeResult.effective_rate}%</p>
+            </div>
+          )}
         </div>
+      )}
+
+      {activeTab === "wht" && (
+        <div>
+          <h2>Withholding Tax Credits</h2>
+          <form onSubmit={calcWht}>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              Chapter 3 Withheld (30%):
+              <input
+                type="number"
+                value={ch3}
+                onChange={(e) => setCh3(parseFloat(e.target.value) || 0)}
+                style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+              />
+            </label>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              Chapter 4 Withheld (FATCA):
+              <input
+                type="number"
+                value={ch4}
+                onChange={(e) => setCh4(parseFloat(e.target.value) || 0)}
+                style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+              />
+            </label>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              Backup Withholding:
+              <input
+                type="number"
+                value={backup}
+                onChange={(e) => setBackup(parseFloat(e.target.value) || 0)}
+                style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+              />
+            </label>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              Estimated Tax Paid:
+              <input
+                type="number"
+                value={est}
+                onChange={(e) => setEst(parseFloat(e.target.value) || 0)}
+                style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+              />
+            </label>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              Prior Year Overpayment:
+              <input
+                type="number"
+                value={overpay}
+                onChange={(e) => setOverpay(parseFloat(e.target.value) || 0)}
+                style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+              />
+            </label>
+            <button type="submit" disabled={loading} style={{ padding: "0.5rem 1rem", background: "#007bff", color: "#fff", border: "none", cursor: "pointer" }}>
+              {loading ? "Berechne..." : "Berechnen"}
+            </button>
+          </form>
+
+          {whtResult && (
+            <div style={{ marginTop: "1.5rem", padding: "1rem", background: "#f0f0f0", borderRadius: "4px" }}>
+              <h3>Credits</h3>
+              <p><strong>Chapter 3:</strong> ${whtResult.total_chapter_3_credit}</p>
+              <p><strong>Chapter 4:</strong> ${whtResult.total_chapter_4_credit}</p>
+              <p><strong>Backup:</strong> ${whtResult.total_backup_credit}</p>
+              <p><strong>Estimated:</strong> ${whtResult.total_estimated_tax}</p>
+              <p><strong>Total Credits:</strong> ${whtResult.total_credits}</p>
+              <p><strong>Refundable:</strong> ${whtResult.refundable_amount}</p>
+              <p><strong>Non-Refundable:</strong> ${whtResult.non_refundable_amount}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "penalty" && (
+        <div>
+          <h2>Penalty Calculator (§6072)</h2>
+          <form onSubmit={calcPen}>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              Filing Deadline:
+              <input
+                type="date"
+                value={filingDL}
+                onChange={(e) => setFilingDL(e.target.value)}
+                style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+              />
+            </label>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              Actual Filing Date:
+              <input
+                type="date"
+                value={actualFD}
+                onChange={(e) => setActualFD(e.target.value)}
+                style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+              />
+            </label>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              Tax Owed:
+              <input
+                type="number"
+                value={taxOwed}
+                onChange={(e) => setTaxOwed(parseFloat(e.target.value) || 0)}
+                style={{ width: "100%", padding: "0.25rem", marginTop: "0.25rem" }}
+              />
+            </label>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              <input type="checkbox" checked={ext} onChange={(e) => setExt(e.target.checked)} />
+              Extension Filed
+            </label>
+            <label style={{ marginBottom: "1rem", display: "block" }}>
+              <input type="checkbox" checked={rc} onChange={(e) => setRc(e.target.checked)} />
+              Reasonable Cause
+            </label>
+            <button type="submit" disabled={loading || !filingDL} style={{ padding: "0.5rem 1rem", background: "#007bff", color: "#fff", border: "none", cursor: "pointer" }}>
+              {loading ? "Berechne..." : "Berechnen"}
+            </button>
+          </form>
+
+          {penResult && (
+            <div style={{ marginTop: "1.5rem", padding: "1rem", background: "#f0f0f0", borderRadius: "4px" }}>
+              <h3>Penalty Breakdown</h3>
+              <p><strong>Days Late:</strong> {penResult.days_late}</p>
+              <p><strong>Late Filing Penalty:</strong> ${penResult.late_filing_penalty}</p>
+              <p><strong>Late Payment Penalty:</strong> ${penResult.late_payment_penalty}</p>
+              <p><strong>Interest:</strong> ${penResult.interest_charges}</p>
+              <p><strong>Total Penalties:</strong> ${penResult.total_penalties}</p>
+              <p><strong>Total Due:</strong> ${penResult.total_amount_due}</p>
+              {penResult.minimum_penalty_applies && <p><strong>Minimum Penalty:</strong> ${penResult.minimum_penalty_amount}</p>}
+              {penResult.waived_due_to_reasonable_cause && <p style={{ color: "green" }}>Penalties waived due to reasonable cause</p>}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ marginTop: "2rem", textAlign: "center" }}>
+        <Link href="/" style={{ color: "#007bff" }}>
+          ← Zurück zum Dashboard
+        </Link>
       </div>
     </div>
   );
