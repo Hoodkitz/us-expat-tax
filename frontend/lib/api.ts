@@ -881,3 +881,139 @@ export async function apiForm8843Overview(): Promise<Form8843Overview> {
   const res = await fetch(`${API_BASE}/api/v1/form8843/overview`);
   return handleResponse<Form8843Overview>(res);
 }
+
+// -----------------------------------------------------------------------
+// Form 8825 — Rental Real Estate Income and Expenses
+// -----------------------------------------------------------------------
+
+export interface FilingRequirement8825Request {
+  entity_type: "individual" | "trust" | "estate" | "partnership" | "corporation" | "llc";
+  rental_income: number;
+  rental_expenses: number;
+  tax_year: number;
+  filing_status: "single" | "married_filing_jointly" | "married_filing_separately" | "head_of_household" | "qualifying_widow";
+  participation_level: "active" | "passive" | "real_estate_professional";
+  modified_agi: number;
+}
+
+export interface FilingRequirement8825Result {
+  filing_required: boolean;
+  reasons: string[];
+  rental_income: number;
+  rental_expenses: number;
+  net_rental_income: number;
+  entity_type: string;
+  tax_year: number;
+  passive_loss_limit: number;
+  allowed_passive_loss: number;
+  suspended_passive_loss: number;
+  related_forms: string[];
+  recommendation: string;
+}
+
+export interface IncomeSummary8825Request {
+  rents_received: number;
+  advance_rents: number;
+  security_deposits_retained: number;
+  rental_expenses_paid_by_tenant: number;
+  tax_year: number;
+}
+
+export interface IncomeSummary8825Result {
+  gross_rental_income: number;
+  advance_rents: number;
+  security_deposits_retained: number;
+  tenant_paid_expenses: number;
+  total_rental_income: number;
+  tax_year: number;
+  explanation: string;
+}
+
+export interface ExpenseCalculation8825Request {
+  advertising: number;
+  auto_travel: number;
+  cleaning_maintenance: number;
+  commissions: number;
+  insurance: number;
+  legal_professional_fees: number;
+  management_fees: number;
+  mortgage_interest: number;
+  repairs: number;
+  supplies: number;
+  taxes: number;
+  utilities: number;
+  depreciation: number;
+  other_expenses: number;
+  tax_year: number;
+}
+
+export interface ExpenseCalculation8825Result {
+  total_expenses: number;
+  expense_breakdown: Record<string, number>;
+  deductible_expenses: number;
+  non_deductible_expenses: number;
+  tax_year: number;
+  explanation: string;
+}
+
+export interface Form8825Overview {
+  title: string;
+  description: string;
+  who_must_file: string[];
+  income_types: string[];
+  expense_categories: string[];
+  passive_loss_rules: string;
+  filing_deadline: string;
+  related_forms: string[];
+  recommendation: string;
+}
+
+export async function apiForm8825FilingRequirement(
+  payload: FilingRequirement8825Request
+): Promise<FilingRequirement8825Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8825/filing-requirement`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<FilingRequirement8825Result>(res);
+}
+
+export async function apiForm8825IncomeSummary(
+  payload: IncomeSummary8825Request
+): Promise<IncomeSummary8825Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8825/income-summary`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<IncomeSummary8825Result>(res);
+}
+
+export async function apiForm8825ExpenseCalculation(
+  payload: ExpenseCalculation8825Request
+): Promise<ExpenseCalculation8825Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8825/expense-calculation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<ExpenseCalculation8825Result>(res);
+}
+
+export async function apiForm8825Overview(): Promise<Form8825Overview> {
+  const res = await fetch(`${API_BASE}/api/v1/form8825/overview`);
+  return handleResponse<Form8825Overview>(res);
+}
