@@ -46,6 +46,7 @@ from app.routers.schedule_a_router import router as schedule_a_router
 from app.routers.form1040nr import router as form1040nr_router
 from app.routers.form1040es_router import router as form1040es_router
 from app.routers.form4868_router import router as form4868_router
+from app.routers.tax_summary import router as tax_summary_router
 from app.modules.logic_engine import TaxpayerInput, evaluate as evaluate_tax
 from app.modules.compliance_state import compute_compliance_flags
 from app.modules.submission_saga import (
@@ -108,6 +109,7 @@ app.include_router(schedule_a_router, prefix="/api/v1/schedule-a")
 app.include_router(form1040nr_router)
 app.include_router(form1040es_router, prefix="/api/v1/form1040es")
 app.include_router(form4868_router, prefix="/api/v1/form4868")
+app.include_router(tax_summary_router, prefix="/api/v1/tax-summary")
 
 # ---------------------------------------------------------------------------
 # Request-Modelle
