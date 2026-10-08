@@ -8,7 +8,7 @@ opencv-python-headless==4.10.*
 pytesseract==0.3.*
 langchain==0.3.*
 langchain-community==0.4.*
-nemoguardrails==0.11.*
+nemoguardrails==0.17.*
 pytest==8.3.*
 pytest-asyncio==0.24.*
 passlib[bcrypt]>=1.7.4
