@@ -1,0 +1,21 @@
+{
+  "tenant_id": "test-tenant-123",
+  "total_calculations": 1,
+  "total_income_usd": "90000.0",
+  "total_tax_paid_usd": "18000.0",
+  "total_us_tax_liability_usd": "15000.0",
+  "recommended_path": "FTC",
+  "last_calculation": {
+    "id": "7dc1c3d2-7055-42b8-851e-58cf6a7aa79e",
+    "timestamp": "2026-10-07T20:23:19.999737+00:00",
+    "recommended_path": "FTC"
+  },
+  "calculations": [
+    {
+      "id": "7dc1c3d2-7055-42b8-851e-58cf6a7aa79e",
+      "timestamp": "2026-10-07T20:23:19.999737+00:00",
+      "recommended_path": "FTC",
+      "income_usd": "90000"
+    }
+  ]
+}
