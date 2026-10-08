@@ -187,7 +187,7 @@ export default function Form8283Page() {
                     className="mr-2"
                   />
                   <span className="text-sm text-gray-700">
-                    Qualified Appraisal Required (>$5,000)
+                    Qualified Appraisal Required (&gt;$5,000)
                   </span>
                 </label>
               </div>
