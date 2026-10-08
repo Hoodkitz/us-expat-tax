@@ -3,105 +3,57 @@
 FastAPI backend for US expatriates filing both German (ELSTER) and US (IRS) tax returns.
 Runs on EKS inside a Linkerd mTLS service mesh with HashiCorp Vault for secrets management.
 
-## Architecture
+[![CI](https://github.com/Hoodkitz/us-expat-tax/actions/workflows/ci.yml/badge.svg)](https://github.com/Hoodkitz/us-expat-tax/actions)
+[![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-```
-Browser / Client
-       │  HTTPS
-       ▼
-linkerd-proxy-edge (mTLS boundary)
-       │  mTLS
-       ├──▶ backend  (FastAPI, port 127.0.0.1:8000)
-       │       ├── Module 1: Tax Logic Engine  (FTC vs FEIE, deterministic)
-       │       ├── Module 2: PSD2/Tink Interface  (read-only bank transactions)
-       │       ├── Module 3: Compliance Flags  (FBAR / FATCA thresholds)
-       │       ├── Module 4: OCR Lohnsteuerbescheinigung
-       │       └── Module 5: Submission Saga  (ELSTER → IRS unlock)
-       │
-       └──▶ erica-service  (ERiC ELSTER wrapper, port 127.0.0.1:8443)
-                └── vault-agent (injects .pfx cert into tmpfs, RAM-only)
+## ✨ Features
 
-vault  (HashiCorp Vault 1.16, HA with Raft, AppRole auth)
-```
+- **Tax Logic Engine**: Deterministische Berechnung von FTC vs. FEIE
+- **PSD2/Tink Integration**: Bankdaten-Import
+- **ELSTER Export**: Deutsche Steuererklärung
+- **IRS Export**: US-Steuererklärung
 
-## Key Services
-
-| Service | Purpose |
-|---|---|
-| `backend` | FastAPI API – tax evaluation, compliance checks, submission orchestration |
-| `erica-service` | ELSTER filing via ERiC library; cert injected from Vault into tmpfs |
-| `vault` | Secrets management; ELSTER .pfx cert never touches persistent disk |
-
-## Quick Start (Docker Compose)
+## 🚀 Installation
 
 ```bash
+# Repository klonen
+git clone https://github.com/Hoodkitz/us-expat-tax.git
+cd us-expat-tax
+
+# Virtual Environment
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Environment
 cp .env.example .env
-# Fill in VAULT_ADDR, TINK_CLIENT_ID/SECRET, DATABASE_URL
-docker compose up --build
 ```
 
-The edge proxy listens on `https://localhost:8443`.
-
-## Kubernetes / EKS Deployment
-
-Manifests live in `k8s/`:
-
-| Manifest | Purpose |
-|---|---|
-| `namespace-and-serviceaccounts.yaml` | Namespace + IRSA service accounts |
-| `fastapi-deployment.yaml` | Backend Deployment + Service |
-| `erica-deployment.yaml` | Erica Deployment with Vault init-container |
-| `erica-vault-agent-configmap.yaml` | Vault Agent template config |
-| `linkerd-mtls-authorization.yaml` | Linkerd `AuthorizationPolicy` (zero-trust) |
-| `network-policies.yaml` | Kubernetes NetworkPolicy (deny-all + allow-list) |
-
-Deploy (CI uses `deploy.yml`):
+## 📖 Usage
 
 ```bash
-kubectl apply -f k8s/
+# Server starten
+uvicorn app.main:app --reload
+
+# API Docs
+# http://localhost:8000/docs
 ```
 
-## Environment Variables
+## 🔌 API
 
-See [`.env.example`](.env.example) for a full, annotated reference.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/tax/calculate` | POST | Steuerberechnung |
+| `/api/tax/ftc` | GET | Foreign Tax Credit |
+| `/api/tax/feie` | GET | Foreign Earned Income Exclusion |
+| `/api/bank/transactions` | GET | Banktransaktionen |
 
-## Security Notes
+## 🤝 Contributing
 
-- The ELSTER organisation certificate (`.pfx`) is **never written to persistent storage**.
-  Vault Agent renders it exclusively into a `tmpfs` mount that is destroyed with the container.
-- All inter-service traffic is mTLS-enforced via Linkerd; `LINKERD2_PROXY_IDENTITY_MODE=required`
-  prevents plain-text fallback.
-- The submission flow is gated behind a TOTP 2FA check (`/api/v1/submission/tollgate`).
-  US forms (1040/1116) are only unlocked after a confirmed ELSTER Transferticket.
-- Tink integration uses **read-only** OAuth scopes (`accounts:read`, `transactions:read`).
-  Payment scopes are explicitly excluded.
-- Guardrails configuration is in `guardrails/` (input/output validation for LLM-adjacent paths).
+Beiträge sind willkommen! Bitte lies [CONTRIBUTING.md](CONTRIBUTING.md) für Guidelines.
 
-## API Endpoints
+## 📄 License
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Liveness probe |
-| `POST` | `/api/v1/tax/evaluate` | FTC vs FEIE recommendation (deterministic) |
-| `GET` | `/api/v1/compliance/flags` | FBAR / FATCA compliance flags |
-|| `POST` | `/api/v1/submission/tollgate` | 2FA gate; returns signed waiver token |
-|| `POST` | `/api/v1/elster/test-connection` | ELSTER connection test (Mock) |
-|| `GET` | `/api/v1/elster/info` | ELSTER integration info |
-
-## ELSTER Integration
-
-**Status:** Mock-Implementierung vorbereitet. Benötigt echten ELSTER-Testzugang für Produktiv-Betrieb.
-
-Die ELSTER-Integration ist als Mock-Implementierung vorbereitet und stellt folgende Endpoints bereit:
-- `POST /api/v1/elster/test-connection` - Testet Verbindung mit Mock-Zertifikat-Status
-- `GET /api/v1/elster/info` - Zeigt verfügbare ELSTER-Endpoints und Requirements
-
-**Für Produktiv-Betrieb benötigt:**
-- ELSTER ERiC-Library Integration
-- Zertifikats-Authentifizierung (Softwarezertifikat)
-- Test-Zugang von ELSTER für Entwicklung
-- Produktiv-Zertifikat für Live-Betrieb
-
-**Dokumentation:** https://www.elster.de/elsterweb/entwickler
-
-**Frontend:** Test-Seite unter `/elster-test`
+MIT — Siehe [LICENSE](LICENSE).
