@@ -9,7 +9,7 @@ pytesseract==0.3.*
 langchain==0.3.*
 langchain-community==0.4.*
 nemoguardrails==0.17.*
-pytest==8.3.*
+pytest==9.1.*
 pytest-asyncio==1.4.*
 passlib[bcrypt]>=1.7.4
 bcrypt>=3.2.0,<4.0.0
