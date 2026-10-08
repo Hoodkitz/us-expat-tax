@@ -4,7 +4,7 @@ sympy==1.13.*
 httpx==0.28.*
 pydantic==2.9.*
 pydantic[email]>=2.9
-opencv-python-headless==4.10.*
+opencv-python-headless==5.0.*
 pytesseract==0.3.*
 langchain==0.3.*
 langchain-community==0.4.*
