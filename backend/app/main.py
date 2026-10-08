@@ -47,6 +47,34 @@ from app.routers.form1040nr import router as form1040nr_router
 from app.routers.form1040es_router import router as form1040es_router
 from app.routers.form4868_router import router as form4868_router
 from app.routers.tax_summary import router as tax_summary_router
+from app.routers.form1040_router import router as form1040_router
+from app.routers.form1040x_router import router as form1040x_router
+from app.routers.form2106_router import router as form2106_router
+from app.routers.form2441_router import router as form2441_router
+from app.routers.form4562_router import router as form4562_router
+from app.routers.form4952_router import router as form4952_router
+from app.routers.form5329_router import router as form5329_router
+from app.routers.form6251_router import router as form6251_router
+from app.routers.form8283_router import router as form8283_router
+from app.routers.form8582_router import router as form8582_router
+from app.routers.form8606_router import router as form8606_router
+from app.routers.form8812_router import router as form8812_router
+from app.routers.form8863_router import router as form8863_router
+from app.routers.form8880_router import router as form8880_router
+from app.routers.form8889_router import router as form8889_router
+from app.routers.form8917_router import router as form8917_router
+from app.routers.form8959_router import router as form8959_router
+from app.routers.form8960_router import router as form8960_router
+from app.routers.form8962_router import router as form8962_router
+from app.routers.form8965_router import router as form8965_router
+from app.routers.form8990_router import router as form8990_router
+from app.routers.form8995_router import router as form8995_router
+from app.routers.schedule_b_router import router as schedule_b_router
+from app.routers.schedule_d_router import router as schedule_d_router
+from app.routers.schedule_e_router import router as schedule_e_router
+from app.routers.schedule_1_router import router as schedule_1_router
+from app.routers.schedule_2_router import router as schedule_2_router
+from app.routers.schedule_3_router import router as schedule_3_router
 from app.modules.logic_engine import TaxpayerInput, evaluate as evaluate_tax
 from app.modules.compliance_state import compute_compliance_flags
 from app.modules.submission_saga import (
@@ -110,6 +138,34 @@ app.include_router(form1040nr_router)
 app.include_router(form1040es_router, prefix="/api/v1/form1040es")
 app.include_router(form4868_router, prefix="/api/v1/form4868")
 app.include_router(tax_summary_router, prefix="/api/v1/tax-summary")
+app.include_router(form1040_router, prefix="/api/v1/form1040")
+app.include_router(form1040x_router, prefix="/api/v1/form1040x")
+app.include_router(form2106_router, prefix="/api/v1/form2106")
+app.include_router(form2441_router, prefix="/api/v1/form2441")
+app.include_router(form4562_router, prefix="/api/v1/form4562")
+app.include_router(form4952_router, prefix="/api/v1/form4952")
+app.include_router(form5329_router, prefix="/api/v1/form5329")
+app.include_router(form6251_router, prefix="/api/v1/form6251")
+app.include_router(form8283_router, prefix="/api/v1/form8283")
+app.include_router(form8582_router, prefix="/api/v1/form8582")
+app.include_router(form8606_router, prefix="/api/v1/form8606")
+app.include_router(form8812_router, prefix="/api/v1/form8812")
+app.include_router(form8863_router, prefix="/api/v1/form8863")
+app.include_router(form8880_router, prefix="/api/v1/form8880")
+app.include_router(form8889_router, prefix="/api/v1/form8889")
+app.include_router(form8917_router, prefix="/api/v1/form8917")
+app.include_router(form8959_router, prefix="/api/v1/form8959")
+app.include_router(form8960_router, prefix="/api/v1/form8960")
+app.include_router(form8962_router, prefix="/api/v1/form8962")
+app.include_router(form8965_router, prefix="/api/v1/form8965")
+app.include_router(form8990_router, prefix="/api/v1/form8990")
+app.include_router(form8995_router, prefix="/api/v1/form8995")
+app.include_router(schedule_b_router, prefix="/api/v1/schedule-b")
+app.include_router(schedule_d_router, prefix="/api/v1/schedule-d")
+app.include_router(schedule_e_router, prefix="/api/v1/schedule-e")
+app.include_router(schedule_1_router, prefix="/api/v1/schedule-1")
+app.include_router(schedule_2_router, prefix="/api/v1/schedule-2")
+app.include_router(schedule_3_router, prefix="/api/v1/schedule-3")
 
 # ---------------------------------------------------------------------------
 # Request-Modelle
