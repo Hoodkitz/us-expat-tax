@@ -780,6 +780,60 @@ export async function apiForm8865Overview(): Promise<Form8865Overview> {
 }
 
 // -----------------------------------------------------------------------
+// Form 8840 — Closer Connection Exception
+// -----------------------------------------------------------------------
+
+export interface Form8840Request {
+  days_in_us: number;
+  tax_year: number;
+  closer_connection: boolean;
+  exempt_individual: boolean;
+}
+
+export interface Form8840Result {
+  resident_alien: boolean;
+  days_in_us: number;
+  closer_connection: boolean;
+  exempt_individual: boolean;
+  explanation: string;
+}
+
+export interface Form8840Overview {
+  form: string;
+  title: string;
+  purpose: string;
+  who_must_file: string[];
+  key_rules: string[];
+  closer_connection_factors: string[];
+  exempt_individual_categories: string[];
+  filing_deadline: string;
+  irs_reference: string;
+}
+
+export async function apiForm8840Calculate(
+  payload: Form8840Request
+): Promise<Form8840Result> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8840/calculate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Form8840Result>(res);
+}
+
+export async function apiForm8840Overview(): Promise<Form8840Overview> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1/form8840/overview`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return handleResponse<Form8840Overview>(res);
+}
+
+// -----------------------------------------------------------------------
 // Form 8843 — Statement for Exempt Individuals
 // -----------------------------------------------------------------------
 
