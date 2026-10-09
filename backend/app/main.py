@@ -63,6 +63,7 @@ from app.routers.form8863_router import router as form8863_router
 from app.routers.form8880_router import router as form8880_router
 from app.routers.form8889_router import router as form8889_router
 from app.routers.form8917_router import router as form8917_router
+from app.routers.form8919_router import router as form8919_router
 from app.routers.form8959_router import router as form8959_router
 from app.routers.form8960_router import router as form8960_router
 from app.routers.form8962_router import router as form8962_router
@@ -154,6 +155,7 @@ app.include_router(form8863_router, prefix="/api/v1/form8863")
 app.include_router(form8880_router, prefix="/api/v1/form8880")
 app.include_router(form8889_router, prefix="/api/v1/form8889")
 app.include_router(form8917_router, prefix="/api/v1/form8917")
+app.include_router(form8919_router, prefix="/api/v1/form8919")
 app.include_router(form8959_router, prefix="/api/v1/form8959")
 app.include_router(form8960_router, prefix="/api/v1/form8960")
 app.include_router(form8962_router, prefix="/api/v1/form8962")
