@@ -3,8 +3,8 @@ Form 8938 FATCA (Foreign Account Tax Compliance Act) module.
 
 Form 8938 requires US persons to report specified foreign financial assets
 when the aggregate value exceeds certain thresholds:
-- Single / Married Filing Separately: $10,000 (year-end) or $15,000 (any time)
-- Married Filing Jointly: $20,000 (year-end) or $30,000 (any time)
+- Single / Married Filing Separately: $50,000 (year-end) or $75,000 (any time)
+- Married Filing Jointly: $100,000 (year-end) or $150,000 (any time)
 
 Penalties:
 - Failure to file: $10,000 per year
@@ -21,11 +21,13 @@ from pydantic import BaseModel, Field
 # Constants
 # ---------------------------------------------------------------------------
 
-# Filing thresholds (USD)
-THRESHOLD_SINGLE_YEAR_END = 10_000.0
-THRESHOLD_SINGLE_ANY_TIME = 15_000.0
-THRESHOLD_MFJ_YEAR_END = 20_000.0
-THRESHOLD_MFJ_ANY_TIME = 30_000.0
+# Filing thresholds (USD) — IRS Form 8938 Instructions (2025)
+# Single / MFS: $50,000 year-end / $75,000 any time
+# MFJ: $100,000 year-end / $150,000 any time
+THRESHOLD_SINGLE_YEAR_END = 50_000.0
+THRESHOLD_SINGLE_ANY_TIME = 75_000.0
+THRESHOLD_MFJ_YEAR_END = 100_000.0
+THRESHOLD_MFJ_ANY_TIME = 150_000.0
 
 # Penalty amounts
 PENALTY_FAILURE_TO_FILE = 10_000.0

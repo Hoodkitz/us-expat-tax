@@ -43,21 +43,21 @@ class TestFilingRequirementSingleBelowThreshold:
                     account_name="Deutsche Bank Savings",
                     account_type="bank_account",
                     country="DE",
-                    max_value_usd=5000.0,
+                    max_value_usd=30_000.0,
                 ),
                 ForeignAccountInput(
                     account_name="Commerzbank Checking",
                     account_type="bank_account",
                     country="DE",
-                    max_value_usd=3000.0,
+                    max_value_usd=15_000.0,
                 ),
             ],
-            tax_year=2024,
+            tax_year=2025,
         )
         result = check_filing_requirement(inp)
         assert result.filing_required is False
         assert result.threshold_usd == THRESHOLD_SINGLE_YEAR_END
-        assert result.total_value_usd == 8000.0
+        assert result.total_value_usd == 45_000.0
         assert result.penalty_if_not_filed == 0.0
         assert "not required" in result.recommendation.lower()
 
@@ -130,14 +130,14 @@ class TestFilingRequirementMFJ:
                     account_name="Joint Savings",
                     account_type="bank_account",
                     country="DE",
-                    max_value_usd=25000.0,
+                    max_value_usd=120_000.0,
                 ),
             ],
-            tax_year=2024,
+            tax_year=2025,
         )
         result = check_filing_requirement(inp)
         assert result.filing_required is True
-        assert result.total_value_usd == 25000.0
+        assert result.total_value_usd == 120_000.0
 
     def test_mfj_multiple_accounts_aggregate(self):
         """Multiple accounts that individually are below but aggregate above."""
@@ -148,26 +148,26 @@ class TestFilingRequirementMFJ:
                     account_name="Account 1",
                     account_type="bank_account",
                     country="DE",
-                    max_value_usd=8000.0,
+                    max_value_usd=40_000.0,
                 ),
                 ForeignAccountInput(
                     account_name="Account 2",
                     account_type="brokerage_account",
                     country="FR",
-                    max_value_usd=7000.0,
+                    max_value_usd=35_000.0,
                 ),
                 ForeignAccountInput(
                     account_name="Account 3",
                     account_type="mutual_fund",
                     country="UK",
-                    max_value_usd=6000.0,
+                    max_value_usd=30_000.0,
                 ),
             ],
-            tax_year=2024,
+            tax_year=2025,
         )
         result = check_filing_requirement(inp)
         assert result.filing_required is True
-        assert result.total_value_usd == 21000.0
+        assert result.total_value_usd == 105_000.0
 
 
 # ---------------------------------------------------------------------------
@@ -413,10 +413,10 @@ class TestEdgeCases:
                     account_name="Test Account",
                     account_type="bank_account",
                     country="DE",
-                    max_value_usd=12000.0,
+                    max_value_usd=55_000.0,
                 ),
             ],
-            tax_year=2024,
+            tax_year=2025,
         )
         result = check_filing_requirement(inp)
         assert result.filing_required is True
@@ -431,10 +431,10 @@ class TestEdgeCases:
                     account_name="Test Account",
                     account_type="bank_account",
                     country="DE",
-                    max_value_usd=12000.0,
+                    max_value_usd=55_000.0,
                 ),
             ],
-            tax_year=2024,
+            tax_year=2025,
         )
         result = check_filing_requirement(inp)
         assert result.filing_required is True
