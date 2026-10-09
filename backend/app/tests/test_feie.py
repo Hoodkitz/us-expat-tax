@@ -146,6 +146,100 @@ def test_feie_2023_limit():
     assert result.feie_exclusion == 120_000.0
 
 
+def test_feie_2025_limit():
+    """Tax year 2025 → limit is $130,000."""
+    inp = FEIEInput(
+        tax_year=2025,
+        foreign_earned_income=150_000.0,
+        housing_costs=0.0,
+        days_in_foreign_country=335,
+        bona_fide_resident=False,
+        filing_status="single",
+    )
+    result = calculate_feie(inp)
+    assert result.feie_limit == 130_000.0
+    assert result.feie_exclusion == 130_000.0
+    assert result.taxable_income_estimate == 20_000.0
+
+
+def test_feie_housing_exclusion_note():
+    """Housing exclusion > 0 → note is added to result."""
+    inp = FEIEInput(
+        tax_year=2024,
+        foreign_earned_income=150_000.0,
+        housing_costs=40_000.0,
+        days_in_foreign_country=335,
+        bona_fide_resident=False,
+        filing_status="single",
+    )
+    result = calculate_feie(inp)
+    assert result.housing_exclusion > 0.0
+    assert any("Housing exclusion claimed" in note for note in result.notes)
+
+
+def test_feie_no_housing_exclusion_note():
+    """Housing exclusion == 0 → no housing note."""
+    inp = FEIEInput(
+        tax_year=2024,
+        foreign_earned_income=80_000.0,
+        housing_costs=0.0,
+        days_in_foreign_country=335,
+        bona_fide_resident=False,
+        filing_status="single",
+    )
+    result = calculate_feie(inp)
+    assert result.housing_exclusion == 0.0
+    assert not any("Housing exclusion claimed" in note for note in result.notes)
+
+
+def test_feie_employer_provided_housing():
+    """Employer-provided housing reduces net housing costs."""
+    inp = FEIEInput(
+        tax_year=2024,
+        foreign_earned_income=150_000.0,
+        housing_costs=40_000.0,
+        days_in_foreign_country=335,
+        bona_fide_resident=False,
+        filing_status="single",
+        employer_provided_housing=10_000.0,
+    )
+    result = calculate_feie(inp)
+    # net_housing = 40000 - 10000 = 30000
+    # housing_base = 126500 * 0.16 = 20240
+    # housing_exclusion = min(30000 - 20240, 126500*0.30) = min(9760, 37950) = 9760
+    expected_he = min(30_000.0 - 126_500.0 * 0.16, 126_500.0 * 0.30)
+    assert result.housing_exclusion == pytest.approx(expected_he, abs=0.01)
+
+
+def test_feie_married_filing_separately_note():
+    """MFS filing status adds a community property note."""
+    inp = FEIEInput(
+        tax_year=2024,
+        foreign_earned_income=80_000.0,
+        housing_costs=0.0,
+        days_in_foreign_country=335,
+        bona_fide_resident=False,
+        filing_status="married_filing_separately",
+    )
+    result = calculate_feie(inp)
+    assert any("Married Filing Separately" in note for note in result.notes)
+
+
+def test_feie_unknown_year_uses_default():
+    """Unknown tax year uses default limit and adds a note."""
+    inp = FEIEInput(
+        tax_year=2030,
+        foreign_earned_income=80_000.0,
+        housing_costs=0.0,
+        days_in_foreign_country=335,
+        bona_fide_resident=False,
+        filing_status="single",
+    )
+    result = calculate_feie(inp)
+    assert result.feie_limit == 130_000.0  # DEFAULT_FEIE_LIMIT
+    assert any("not in the pre-loaded limit table" in note for note in result.notes)
+
+
 def test_housing_exclusion():
     """Housing costs above base amount generate a housing exclusion."""
     inp = FEIEInput(

@@ -14,8 +14,9 @@ FEIE_LIMITS: dict[int, float] = {
     2022: 112_000.0,
     2023: 120_000.0,
     2024: 126_500.0,
+    2025: 130_000.0,
 }
-DEFAULT_FEIE_LIMIT = 126_500.0
+DEFAULT_FEIE_LIMIT = 130_000.0
 
 FilingStatus = Literal[
     "single",
