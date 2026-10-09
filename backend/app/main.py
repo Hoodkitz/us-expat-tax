@@ -76,6 +76,7 @@ from app.routers.schedule_e_router import router as schedule_e_router
 from app.routers.schedule_1_router import router as schedule_1_router
 from app.routers.schedule_2_router import router as schedule_2_router
 from app.routers.schedule_3_router import router as schedule_3_router
+from app.routers.schedule_r_router import router as schedule_r_router
 from app.modules.logic_engine import TaxpayerInput, evaluate as evaluate_tax
 from app.modules.compliance_state import compute_compliance_flags
 from app.modules.submission_saga import (
@@ -168,6 +169,7 @@ app.include_router(schedule_e_router, prefix="/api/v1/schedule-e")
 app.include_router(schedule_1_router, prefix="/api/v1/schedule-1")
 app.include_router(schedule_2_router, prefix="/api/v1/schedule-2")
 app.include_router(schedule_3_router, prefix="/api/v1/schedule-3")
+app.include_router(schedule_r_router, prefix="/api/v1/schedule-r")
 
 # ---------------------------------------------------------------------------
 # Request-Modelle
