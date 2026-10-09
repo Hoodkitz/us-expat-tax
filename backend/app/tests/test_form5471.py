@@ -1,7 +1,7 @@
 """
 Tests for Form 5471 CFC Reporting Assistant.
 
-Covers (≥16 tests):
+Covers (≥25 tests):
 - Filing requirement: Category 4 ownership > 50% → must_file = True
 - Filing requirement: Category 5 ownership >= 10% → must_file = True
 - Filing requirement: Category 5 ownership < 10% → must_file = False
@@ -18,11 +18,15 @@ Covers (≥16 tests):
 - GILTI: DTIR covers full tested income → gilti_inclusion = 0
 - GILTI: ownership_pct < 100% reduces pro-rata share
 - GILTI: 50% §250 deduction for corporations
+- Income calculation: combined Subpart F + GILTI
+- Income calculation: response structure validation
+- Income calculation: total_inclusion = subpart_f + gilti
 - GET /overview: 200 OK, no auth required
 - GET /overview: expected keys present
 - POST /filing-requirement without token → 401
 - POST /subpart-f-income without token → 401
 - POST /gilti-calculator without token → 401
+- POST /income-calculation without token → 401
 """
 from __future__ import annotations
 
@@ -499,4 +503,97 @@ def test_gilti_unauthenticated_401():
         "ownership_pct": 100.0,
     }
     resp = client.post(f"{BASE}/gilti-calculator", json=payload)
+    assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Income Calculation (Combined Subpart F + GILTI) Tests
+# ---------------------------------------------------------------------------
+
+
+def test_income_calculation_combined(auth_token):
+    """Combined income calculation returns both subpart_f and gilti results."""
+    payload = {
+        "passive_income_usd": 50_000.0,
+        "sales_income_usd": 20_000.0,
+        "services_income_usd": 10_000.0,
+        "foreign_base_company_income_usd": 30_000.0,
+        "total_cfc_income_usd": 200_000.0,
+        "net_tested_income_usd": 500_000.0,
+        "qualified_business_asset_investment_usd": 1_000_000.0,
+        "deemed_tangible_income_return_pct": 10.0,
+        "ownership_pct": 100.0,
+        "tax_year": 2024,
+    }
+    resp = client.post(f"{BASE}/income-calculation", json=payload, headers=auth_headers(auth_token))
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "subpart_f" in data
+    assert "gilti" in data
+    assert "total_inclusion_usd" in data
+    assert data["subpart_f"]["subpart_f_total_usd"] == 80_000.0
+    assert data["gilti"]["gilti_inclusion_usd"] == 400_000.0
+    assert data["total_inclusion_usd"] == 480_000.0
+
+
+def test_income_calculation_response_structure(auth_token):
+    """Income calculation response contains all required keys."""
+    payload = {
+        "passive_income_usd": 10_000.0,
+        "sales_income_usd": 5_000.0,
+        "services_income_usd": 5_000.0,
+        "foreign_base_company_income_usd": 5_000.0,
+        "total_cfc_income_usd": 50_000.0,
+        "net_tested_income_usd": 300_000.0,
+        "qualified_business_asset_investment_usd": 500_000.0,
+        "deemed_tangible_income_return_pct": 10.0,
+        "ownership_pct": 100.0,
+        "tax_year": 2024,
+    }
+    resp = client.post(f"{BASE}/income-calculation", json=payload, headers=auth_headers(auth_token))
+    assert resp.status_code == 200
+    data = resp.json()
+    for key in ("subpart_f", "gilti", "total_inclusion_usd", "tax_year"):
+        assert key in data, f"Missing key: {key}"
+    assert isinstance(data["subpart_f"], dict)
+    assert isinstance(data["gilti"], dict)
+    assert data["tax_year"] == 2024
+
+
+def test_income_calculation_total_inclusion(auth_token):
+    """total_inclusion_usd = subpart_f_total_usd + gilti_inclusion_usd."""
+    payload = {
+        "passive_income_usd": 25_000.0,
+        "sales_income_usd": 0.0,
+        "services_income_usd": 0.0,
+        "foreign_base_company_income_usd": 25_000.0,
+        "total_cfc_income_usd": 100_000.0,
+        "net_tested_income_usd": 200_000.0,
+        "qualified_business_asset_investment_usd": 1_000_000.0,
+        "deemed_tangible_income_return_pct": 10.0,
+        "ownership_pct": 100.0,
+        "tax_year": 2024,
+    }
+    resp = client.post(f"{BASE}/income-calculation", json=payload, headers=auth_headers(auth_token))
+    assert resp.status_code == 200
+    data = resp.json()
+    expected_total = data["subpart_f"]["subpart_f_total_usd"] + data["gilti"]["gilti_inclusion_usd"]
+    assert data["total_inclusion_usd"] == pytest.approx(expected_total)
+
+
+def test_income_calculation_unauthenticated_401():
+    """POST /income-calculation without token → 401."""
+    payload = {
+        "passive_income_usd": 10_000.0,
+        "sales_income_usd": 0.0,
+        "services_income_usd": 0.0,
+        "foreign_base_company_income_usd": 0.0,
+        "total_cfc_income_usd": 50_000.0,
+        "net_tested_income_usd": 100_000.0,
+        "qualified_business_asset_investment_usd": 500_000.0,
+        "deemed_tangible_income_return_pct": 10.0,
+        "ownership_pct": 100.0,
+        "tax_year": 2024,
+    }
+    resp = client.post(f"{BASE}/income-calculation", json=payload)
     assert resp.status_code == 401
