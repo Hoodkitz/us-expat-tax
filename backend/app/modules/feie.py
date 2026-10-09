@@ -136,7 +136,7 @@ def calculate_feie(inp: FEIEInput) -> FEIEResult:
             "independently. Community property rules may apply."
         )
 
-    if inp.housing_exclusion if False else housing_exclusion > 0:
+    if housing_exclusion > 0:
         notes.append(
             "Housing exclusion claimed. Attach Form 2555 Part VII. "
             "Location-specific housing limits (IRS Notice 2024-18 or current year) "
