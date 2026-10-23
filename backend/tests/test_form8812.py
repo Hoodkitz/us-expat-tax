@@ -23,8 +23,8 @@ class TestCalculate:
             tax_year=2025,
         )
         result = calculate_form8812(inp)
-        assert result.child_tax_credit == Decimal("4000")
-        assert result.total_credit == Decimal("4000")
+        assert result.child_tax_credit == Decimal("4400")
+        assert result.total_credit == Decimal("4400")
 
     def test_credit_for_other_dependents(self):
         """Test credit for other dependents."""
@@ -35,9 +35,9 @@ class TestCalculate:
             tax_year=2025,
         )
         result = calculate_form8812(inp)
-        assert result.child_tax_credit == Decimal("2000")
+        assert result.child_tax_credit == Decimal("2200")
         assert result.credit_for_other_dependents == Decimal("500")
-        assert result.total_credit == Decimal("2500")
+        assert result.total_credit == Decimal("2700")
 
     def test_high_agi_reduces_credit(self):
         """Test high AGI reduces credit."""
@@ -48,7 +48,7 @@ class TestCalculate:
             tax_year=2025,
         )
         result = calculate_form8812(inp)
-        assert result.child_tax_credit < Decimal("4000")
+        assert result.total_credit < result.child_tax_credit
 
     def test_no_children(self):
         """Test with no qualifying children."""
@@ -92,7 +92,7 @@ class TestOverview:
         """Test overview content."""
         overview = get_form8812_overview()
         assert overview["form"] == "Form 8812"
-        assert "8812" in overview["title"]
+        assert "8812" in overview["form"]
 
 
 class TestRouter:

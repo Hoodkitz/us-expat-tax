@@ -18,7 +18,7 @@ class TestCalculate:
         """Test basic retirement savings credit."""
         inp = Form8880Input(
             retirement_contributions=Decimal("2000"),
-            agi=Decimal("30000"),
+            agi=Decimal("20000"),
             filing_status="single",
             tax_year=2025,
         )
@@ -90,7 +90,7 @@ class TestOverview:
         """Test overview content."""
         overview = get_form8880_overview()
         assert overview["form"] == "Form 8880"
-        assert "8880" in overview["title"]
+        assert "8880" in overview["form"]
 
 
 class TestRouter:

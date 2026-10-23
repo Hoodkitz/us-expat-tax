@@ -6,8 +6,6 @@ pydantic==2.9.*
 pydantic[email]>=2.9
 opencv-python-headless==5.0.*
 pytesseract==0.3.*
-langchain==0.3.*
-langchain-community==0.4.*
 nemoguardrails==0.17.*
 pytest==9.1.*
 pytest-asyncio==1.4.*

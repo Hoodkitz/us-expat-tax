@@ -10,6 +10,7 @@ JWT Mandanten-Authentifizierung ist für alle /api/v1/ Routen aktiv.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -87,6 +88,20 @@ from app.modules.submission_saga import (
     TollgateError,
 )
 
+DISCLAIMER_EN = (
+    "Informational estimates only. This software does not provide tax, legal or "
+    "accounting advice and is not a substitute for a licensed CPA, enrolled agent "
+    "or Steuerberater. Results may be incomplete or outdated; you are solely "
+    "responsible for your tax filings."
+)
+DISCLAIMER_DE = (
+    "Nur unverbindliche Orientierungswerte. Diese Software leistet keine Steuer-, "
+    "Rechts- oder Buchhaltungsberatung und ersetzt keinen Steuerberater, CPA oder "
+    "Enrolled Agent. Ergebnisse können unvollständig oder veraltet sein; die "
+    "Verantwortung für Ihre Steuererklärungen liegt allein bei Ihnen."
+)
+DISCLAIMER_HEADER = "Not tax advice; estimates only. See /api/v1/disclaimer."
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("app.main")
 
@@ -101,11 +116,21 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Rechtlicher Hinweis: jede API-Antwort trägt den Disclaimer als Header.
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def add_disclaimer_header(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Tax-Disclaimer"] = DISCLAIMER_HEADER
+    return response
+
 
 # ---------------------------------------------------------------------------
 # Auth-Router einbinden
@@ -215,6 +240,12 @@ async def health() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/api/v1/disclaimer")
+async def disclaimer_endpoint() -> dict:
+    """Public legal notice. Clients must show this next to any calculation."""
+    return {"disclaimer_de": DISCLAIMER_DE, "disclaimer_en": DISCLAIMER_EN}
+
+
 # ---------------------------------------------------------------------------
 # Geschützte Endpunkte (JWT-Pflicht)
 # ---------------------------------------------------------------------------
@@ -280,11 +311,18 @@ async def tollgate_endpoint(
 ) -> dict:
     """
     Muss erfolgreich durchlaufen werden, BEVOR /submission/submit
-    aufgerufen werden darf. Server-Secret kommt aus Vault, hier als
-    Platzhalter-Injektion markiert.
+    aufgerufen werden darf. Server-Secret kommt aus der Umgebung
+    (TOLLGATE_SERVER_SECRET, in Produktion per Vault-Agent injiziert).
     """
     _audit(current_tenant, "/api/v1/submission/tollgate")
-    server_secret = b"REPLACE_WITH_VAULT_INJECTED_SECRET"  # TODO: Vault-Anbindung
+    # Secret is injected via env (rendered by vault-agent in production).
+    secret = os.getenv("TOLLGATE_SERVER_SECRET")
+    if not secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Tollgate ist nicht konfiguriert (TOLLGATE_SERVER_SECRET fehlt).",
+        )
+    server_secret = secret.encode("utf-8")
 
     try:
         waiver = create_liability_waiver(payload.user_id, payload.totp_code, server_secret)

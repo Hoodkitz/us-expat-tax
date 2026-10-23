@@ -67,7 +67,7 @@ class TestCalculateForm8880:
         """Single filer with AGI between $21,750 and $23,625 → 20% credit rate."""
         inp = Form8880Input(
             retirement_contributions=Decimal("2000"),
-            agi=Decimal("22000"),
+            agi=Decimal("24000"),
             filing_status="single",
             tax_year=2025,
         )
@@ -115,7 +115,7 @@ class TestCalculateForm8880:
         """Married filing jointly with AGI between $43,500 and $47,250 → 20%."""
         inp = Form8880Input(
             retirement_contributions=Decimal("2000"),
-            agi=Decimal("45000"),
+            agi=Decimal("49000"),
             filing_status="married_joint",
             tax_year=2025,
         )
@@ -163,7 +163,7 @@ class TestCalculateForm8880:
         """Head of household with AGI between $32,625 and $35,438 → 20%."""
         inp = Form8880Input(
             retirement_contributions=Decimal("2000"),
-            agi=Decimal("34000"),
+            agi=Decimal("36500"),
             filing_status="head_of_household",
             tax_year=2025,
         )
@@ -229,33 +229,33 @@ class TestCalculateForm8880:
         result = calculate_form8880(inp)
         assert result.credit_amount == Decimal("500.00")
 
-    def test_boundary_single_21750(self):
-        """Boundary: single filer at exactly $21,750 → 20% rate (not 50%)."""
+    def test_boundary_single_just_over_23750(self):
+        """Boundary: single filer at just over $23,750 → 20% rate (not 50%)."""
         inp = Form8880Input(
             retirement_contributions=Decimal("2000"),
-            agi=Decimal("21750"),
+            agi=Decimal("23751"),
             filing_status="single",
             tax_year=2025,
         )
         result = calculate_form8880(inp)
         assert result.credit_rate == Decimal("0.20")
 
-    def test_boundary_single_23625(self):
-        """Boundary: single filer at exactly $23,625 → 10% rate (not 20%)."""
+    def test_boundary_single_just_over_25500(self):
+        """Boundary: single filer at just over $25,500 → 10% rate (not 20%)."""
         inp = Form8880Input(
             retirement_contributions=Decimal("2000"),
-            agi=Decimal("23625"),
+            agi=Decimal("25501"),
             filing_status="single",
             tax_year=2025,
         )
         result = calculate_form8880(inp)
         assert result.credit_rate == Decimal("0.10")
 
-    def test_boundary_single_36500(self):
-        """Boundary: single filer at exactly $36,500 → 0% rate (not 10%)."""
+    def test_boundary_single_just_over_39500(self):
+        """Boundary: single filer at just over $39,500 → 0% rate (not 10%)."""
         inp = Form8880Input(
             retirement_contributions=Decimal("2000"),
-            agi=Decimal("36500"),
+            agi=Decimal("39501"),
             filing_status="single",
             tax_year=2025,
         )

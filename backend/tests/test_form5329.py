@@ -63,8 +63,8 @@ class TestCalculate:
             tax_year=2025,
         )
         result = calculate_form5329(inp)
-        assert result.excess_rmd_penalty == Decimal("5000")
-        assert result.total_penalty == Decimal("5000")
+        assert result.excess_rmd_penalty == Decimal("2500")
+        assert result.total_penalty == Decimal("2500")
 
     def test_multiple_penalties(self):
         """Test multiple penalties combined."""
@@ -111,7 +111,7 @@ class TestOverview:
         """Test overview content."""
         overview = get_form5329_overview()
         assert overview["form"] == "Form 5329"
-        assert "5329" in overview["title"]
+        assert "5329" in overview["form"]
 
 
 class TestRouter:

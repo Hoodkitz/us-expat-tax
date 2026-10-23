@@ -16,3 +16,9 @@ dist/
 # Local scratch
 .DS_Store
 *.log
+
+venv*/
+node_modules/
+.next/
+backend/data/*.json
+backend/app/data/*.json

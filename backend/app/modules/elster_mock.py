@@ -1,8 +1,10 @@
 """
 ELSTER Mock-Integration für us-expat-tax.
 
-TODO: Diese Modul-Implementierung ist ein Platzhalter und muss durch
-echte ELSTER-API-Integration mit Zertifikat-Authentifizierung ersetzt werden.
+BEKANNTE EINSCHRAENKUNG: Diese Implementierung ist ein Mock. Eine echte
+ELSTER-Uebermittlung benoetigt die proprietaere ERiC-Bibliothek, ein
+ELSTER-Organisationszertifikat und Entwicklerzugang (nicht Teil dieses
+Repos). Siehe erica-service/ und README (Abschnitt "Go-Live").
 Siehe: https://www.elster.de/elsterweb/entwickler
 """
 
@@ -14,10 +16,8 @@ def test_elster_connection() -> Dict[str, Any]:
     """
     Mock-Implementierung eines ELSTER-Verbindungstests.
     
-    TODO: Implementierung mit echtem ELSTER-Testzugang:
-    - Zertifikats-Authentifizierung (ERiC-Library)
-    - Test-Steuernummer-Validierung
-    - Echte API-Aufrufe an ELSTER-Infrastruktur
+    Ein echter Verbindungstest (ERiC, Zertifikat) ist nicht implementiert;
+    der Aufrufer erhaelt daher immer "connected_mock".
     
     Returns:
         Dict mit Status, Zertifikat-Info und Test-Steuernummer

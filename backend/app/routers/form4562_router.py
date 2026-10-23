@@ -24,8 +24,9 @@ class Form4562Request(BaseModel):
     asset_cost: str = Field(..., description="Cost of asset")
     asset_type: str = Field(..., description="Type of asset (5, 7, 15, 27.5, 39 year)")
     business_use_percentage: str = Field("100", description="Business use percentage")
-    section_179_election: str = Field("0", description="Section 179 election amount")
-    bonus_depreciation: str = Field("0", description="Bonus depreciation amount")
+    section_179_election: bool = Field(False, description="Elect Section 179 expensing")
+    bonus_depreciation: bool = Field(False, description="Claim bonus depreciation")
+    acquired_after_2025_01_19: bool = Field(False, description="Property acquired after Jan 19, 2025 (100% bonus)")
     tax_year: int = Field(2025, description="Tax year")
 
 
@@ -40,9 +41,10 @@ async def calculate(
             asset_cost=Decimal(payload.asset_cost),
             asset_type=payload.asset_type,
             business_use_percentage=Decimal(payload.business_use_percentage),
-            section_179_election=Decimal(payload.section_179_election),
-            bonus_depreciation=Decimal(payload.bonus_depreciation),
+            section_179_election=payload.section_179_election,
+            bonus_depreciation=payload.bonus_depreciation,
             tax_year=payload.tax_year,
+            acquired_after_2025_01_19=payload.acquired_after_2025_01_19,
         )
         result = calculate_form4562(inp)
         return {

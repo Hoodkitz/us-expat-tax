@@ -12,7 +12,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret-change-in-prod")
+_DEV_SECRET = "dev-secret-change-in-prod"
+SECRET_KEY: str = os.getenv("SECRET_KEY", _DEV_SECRET)
+if os.getenv("APP_ENV", "development").lower() == "production" and (
+    SECRET_KEY == _DEV_SECRET or len(SECRET_KEY) < 32
+):
+    raise RuntimeError(
+        "SECRET_KEY must be set to a random value of at least 32 characters when APP_ENV=production."
+    )
 ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_HOURS: int = 24
 

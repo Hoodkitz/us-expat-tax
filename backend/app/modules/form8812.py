@@ -16,6 +16,7 @@ class Form8812Input:
     num_other_dependents: int
     agi: Decimal
     tax_year: int = 2025
+    filing_status: str = "single"
 
 
 @dataclass
@@ -28,7 +29,7 @@ class Form8812Result:
     explanation: str
 
 
-CHILD_TAX_CREDIT_PER_CHILD = Decimal("2000")
+CHILD_TAX_CREDIT_PER_CHILD = Decimal("2200")  # 2025, P.L. 119-21
 CREDIT_FOR_OTHER_DEPENDENTS = Decimal("500")
 REFUNDABLE_CREDIT_PER_CHILD = Decimal("1700")
 
@@ -45,9 +46,10 @@ def calculate_form8812(inp: Form8812Input) -> Form8812Result:
     
     total_credit = child_tax_credit + credit_for_other_dependents
     
-    # Phase-out (simplified - assumes single filer)
-    if inp.agi > PHASEOUT_SINGLE:
-        excess = inp.agi - PHASEOUT_SINGLE
+    # Phase-out: $50 per $1,000 (or fraction) of AGI above the threshold
+    threshold = PHASEOUT_MARRIED if inp.filing_status == "married_joint" else PHASEOUT_SINGLE
+    if inp.agi > threshold:
+        excess = inp.agi - threshold
         phaseout = (excess / Decimal("1000")) * Decimal("50")
         total_credit = max(total_credit - phaseout, Decimal("0"))
     

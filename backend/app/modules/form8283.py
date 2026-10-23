@@ -33,7 +33,12 @@ def calculate_form8283(inp: Form8283Input) -> Form8283Result:
     deductible_amount = inp.fair_market_value
     
     # Appraisal required for property over $5,000
-    appraisal_required = inp.fair_market_value > Decimal("5000")
+    # (publicly traded securities are exempt from the appraisal requirement)
+    exempt_types = {"stock", "publicly_traded_securities", "cash"}
+    appraisal_required = (
+        inp.fair_market_value > Decimal("5000")
+        and inp.property_type.lower() not in exempt_types
+    )
     
     explanation = (
         f"Noncash contribution: FMV ${deductible_amount:,.2f}, "

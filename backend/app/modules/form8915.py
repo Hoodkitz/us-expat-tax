@@ -235,7 +235,7 @@ def check_penalty_waiver(inp: PenaltyWaiverInput) -> PenaltyWaiverResult:
     - Waiver is automatic for distributions meeting Form 8915 requirements
     """
     # Standard penalty calculation (for comparison)
-    standard_penalty = inp.distribution_amt * EARLY_WITHDRAWAL_PENALTY_RATE
+    standard_penalty = (inp.distribution_amt * EARLY_WITHDRAWAL_PENALTY_RATE).quantize(Decimal("0.01"))
     
     # For qualified disaster distributions, penalty is waived
     waiver_eligible = True

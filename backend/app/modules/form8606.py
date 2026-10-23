@@ -35,8 +35,10 @@ def calculate_form8606(inp: Form8606Input) -> Form8606Result:
     total_basis = inp.traditional_ira_basis + inp.nondeductible_contributions
     
     # Pro-rata rule
-    if inp.ira_balance > 0:
-        nontaxable_ratio = total_basis / inp.ira_balance
+    # (basis / (year-end IRA value + distributions), capped at 100%)
+    denominator = inp.ira_balance + inp.distributions
+    if denominator > 0:
+        nontaxable_ratio = min(total_basis / denominator, Decimal("1"))
     else:
         nontaxable_ratio = Decimal("0")
     

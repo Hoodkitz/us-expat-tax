@@ -22,7 +22,7 @@ async def elster_test_connection_endpoint(
     """
     Testet die ELSTER-Verbindung (Mock-Implementierung).
     
-    TODO: Ersetzen durch echten ELSTER-API-Aufruf mit Zertifikats-Authentifizierung.
+    Hinweis: Nur Mock. Echte Uebermittlung erfordert ERiC + Zertifikat (siehe README).
     
     Returns:
         Dict mit Verbindungs-Status, Zertifikat-Info und Test-Steuernummer

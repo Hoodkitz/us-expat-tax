@@ -27,7 +27,7 @@ def _get_auth_token() -> str:
     """Register a test user and return JWT token."""
     # Register
     client.post(
-        "/api/v1/auth/register",
+        "/auth/register",
         json={
             "email": "test_form8843@example.com",
             "tenant_name": "Test Tenant",
@@ -36,7 +36,7 @@ def _get_auth_token() -> str:
     )
     # Login
     resp = client.post(
-        "/api/v1/auth/login",
+        "/auth/login",
         json={
             "email": "test_form8843@example.com",
             "password": "testpassword123",
@@ -108,8 +108,8 @@ class TestExemptIndividualModule:
         result = check_exempt_status(inp)
         assert result.exempt_status is True
 
-    def test_athlete_p_visa_is_exempt(self):
-        """Athlete on P visa should be exempt."""
+    def test_athlete_p_visa_without_role_not_exempt(self):
+        """P visa alone is not enough (only charitable-event athletes qualify, IRC 7701(b)(5)(A)(iv))."""
         inp = ExemptIndividualInput(
             us_days_present=60,
             foreign_days_present=305,
@@ -117,7 +117,7 @@ class TestExemptIndividualModule:
             visa_type="P",
         )
         result = check_exempt_status(inp)
-        assert result.exempt_status is True
+        assert result.exempt_status is False
 
     def test_h_visa_not_exempt(self):
         """H visa holder is not exempt."""

@@ -44,10 +44,10 @@ class Form1040Result:
 # ---------------------------------------------------------------------------
 
 STANDARD_DEDUCTIONS = {
-    "single": Decimal("15000"),
-    "married_joint": Decimal("30000"),
-    "married_separate": Decimal("15000"),
-    "head_of_household": Decimal("22500"),
+    "single": Decimal("15750"),
+    "married_joint": Decimal("31500"),
+    "married_separate": Decimal("15750"),
+    "head_of_household": Decimal("23625"),
 }
 
 TAX_BRACKETS_SINGLE = [
@@ -135,7 +135,7 @@ def calculate_form1040(inp: Form1040Input) -> Form1040Result:
     agi = inp.gross_income - inp.adjustments
     
     # Apply standard or itemized deduction
-    standard_deduction = STANDARD_DEDUCTIONS.get(inp.filing_status, Decimal("15000"))
+    standard_deduction = STANDARD_DEDUCTIONS.get(inp.filing_status, Decimal("15750"))
     deduction = max(inp.deductions, standard_deduction)
     
     # Calculate taxable income
@@ -189,7 +189,7 @@ def get_form1040_overview() -> dict:
         ],
         "key_rules": [
             "Progressive tax rates from 10% to 37%",
-            "Standard deduction: $15,000 (single), $30,000 (married filing jointly)",
+            "Standard deduction (2025, as amended by P.L. 119-21): $15,750 (single), $31,500 (married filing jointly)",
             "Tax credits can reduce tax liability dollar-for-dollar",
             "Above-the-line deductions reduce AGI",
         ],

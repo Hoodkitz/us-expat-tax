@@ -1,0 +1,25 @@
+# Lokale Entwicklung / Demo: nur Backend + Frontend, ohne Vault/Linkerd/ERiC.
+#   docker compose -f docker-compose.dev.yml up --build
+# Frontend: http://localhost:3000   API: http://localhost:8000/docs
+services:
+  backend:
+    build: ./backend
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-in-prod}
+      CORS_ORIGINS: http://localhost:3000
+      TOLLGATE_SERVER_SECRET: ${TOLLGATE_SERVER_SECRET:-}
+      TZ: Europe/Berlin
+    volumes:
+      - backend-data:/srv/app/data
+    ports:
+      - "8000:8000"
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on: [backend]
+    ports:
+      - "3000:3000"
+volumes:
+  backend-data:

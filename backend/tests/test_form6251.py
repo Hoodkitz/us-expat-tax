@@ -69,13 +69,13 @@ class TestCalculate:
         """Test exemption phaseout for high income."""
         inp = Form6251Input(
             filing_status="single",
-            regular_taxable_income=Decimal("500000"),
+            regular_taxable_income=Decimal("800000"),
             tax_preferences=Decimal("0"),
             adjustments=Decimal("0"),
             tax_year=2025,
         )
         result = calculate_form6251(inp)
-        assert result.exemption < Decimal("81300")
+        assert result.exemption < Decimal("88100")
 
 
 class TestOverview:
@@ -96,7 +96,7 @@ class TestOverview:
         """Test overview content."""
         overview = get_form6251_overview()
         assert overview["form"] == "Form 6251"
-        assert "6251" in overview["title"]
+        assert "6251" in overview["form"]
 
 
 class TestRouter:

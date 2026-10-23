@@ -144,7 +144,7 @@ export default function Form8840Page() {
             Form 8840: Closer Connection Exception
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Prüfen Sie, ob Sie durch eine „Closer Connection" an die USA gebunden sind
+            Prüfen Sie, ob Sie durch eine „Closer Connection“ an die USA gebunden sind
             und als Resident Alien gelten — auch wenn Sie weniger als 183 Tage in den
             USA waren.
           </p>
@@ -360,7 +360,7 @@ export default function Form8840Page() {
 
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">
-                  Faktoren für eine „Closer Connection"
+                  Faktoren für eine „Closer Connection“
                 </h3>
                 <ul className="text-sm text-gray-600 space-y-1">
                   {overview.closer_connection_factors.map((factor, i) => (
