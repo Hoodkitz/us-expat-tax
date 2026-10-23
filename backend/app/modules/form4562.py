@@ -18,6 +18,7 @@ class Form4562Input:
     section_179_election: bool
     bonus_depreciation: bool
     tax_year: int = 2025
+    acquired_after_2025_01_19: bool = False  # 100% bonus under P.L. 119-21
 
 
 @dataclass
@@ -39,13 +40,14 @@ MACRS_RATES = {
     "39-year": [Decimal("0.02564")],
 }
 
-SECTION_179_LIMIT = Decimal("1220000")  # 2025
-BONUS_DEPRECIATION_RATE = Decimal("0.40")  # 2025
+SECTION_179_LIMIT = Decimal("2500000")  # 2025 (P.L. 119-21)
+BONUS_DEPRECIATION_RATE = Decimal("0.40")  # 2025, property acquired before Jan 20, 2025
+BONUS_DEPRECIATION_RATE_NEW = Decimal("1.00")  # property acquired after Jan 19, 2025
 
 
 def calculate_form4562(inp: Form4562Input) -> Form4562Result:
     """Calculate Form 4562 depreciation."""
-    business_cost = inp.asset_cost * inp.business_use_percentage
+    business_cost = inp.asset_cost * inp.business_use_percentage / Decimal("100")
     
     # Section 179 deduction
     section_179_deduction = Decimal("0")
@@ -57,7 +59,8 @@ def calculate_form4562(inp: Form4562Input) -> Form4562Result:
     # Bonus depreciation
     bonus_dep = Decimal("0")
     if inp.bonus_depreciation:
-        bonus_dep = (remaining_basis * BONUS_DEPRECIATION_RATE).quantize(Decimal("0.01"))
+        rate = BONUS_DEPRECIATION_RATE_NEW if inp.acquired_after_2025_01_19 else BONUS_DEPRECIATION_RATE
+        bonus_dep = (remaining_basis * rate).quantize(Decimal("0.01"))
     
     remaining_basis -= bonus_dep
     
@@ -93,8 +96,8 @@ def get_form4562_overview() -> dict:
             "Rental property owners",
         ],
         "key_rules": [
-            "Section 179 expensing: up to $1,220,000 (2025)",
-            "Bonus depreciation: 40% (2025)",
+            "Section 179 expensing: up to $2,500,000 (2025, P.L. 119-21)",
+            "Bonus depreciation: 40% (acquired before Jan 20, 2025), 100% (acquired after Jan 19, 2025)",
             "MACRS recovery periods: 5, 7, 15, 27.5, 39 years",
             "Listed property has special rules",
         ],

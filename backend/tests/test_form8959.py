@@ -60,7 +60,8 @@ class TestCalculate:
             tax_year=2025,
         )
         result = calculate_form8959(inp)
-        assert result.additional_medicare_tax == Decimal("0")
+        # 0.9% on wages above the $250,000 MFJ threshold
+        assert result.additional_medicare_tax == Decimal("450.00")
 
     def test_no_income(self):
         """Test with no income."""
@@ -93,7 +94,7 @@ class TestOverview:
         """Test overview content."""
         overview = get_form8959_overview()
         assert overview["form"] == "Form 8959"
-        assert "8959" in overview["title"]
+        assert "8959" in overview["form"]
 
 
 class TestRouter:

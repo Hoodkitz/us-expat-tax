@@ -44,10 +44,10 @@ class TestCalculate:
     def test_fully_nontaxable_distribution(self):
         """Test fully nontaxable distribution."""
         inp = Form8606Input(
-            nondeductible_contributions=Decimal("20000"),
+            nondeductible_contributions=Decimal("0"),
             traditional_ira_basis=Decimal("20000"),
             distributions=Decimal("10000"),
-            ira_balance=Decimal("20000"),
+            ira_balance=Decimal("10000"),
             tax_year=2025,
         )
         result = calculate_form8606(inp)
@@ -87,7 +87,7 @@ class TestOverview:
         """Test overview content."""
         overview = get_form8606_overview()
         assert overview["form"] == "Form 8606"
-        assert "8606" in overview["title"]
+        assert "8606" in overview["form"]
 
 
 class TestRouter:

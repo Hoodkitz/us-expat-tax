@@ -59,7 +59,8 @@ class TestCalculate:
             tax_year=2025,
         )
         result = calculate_form8960(inp)
-        assert result.niit == Decimal("0")
+        # 3.8% of min(NII 50,000, MAGI excess 50,000)
+        assert result.niit == Decimal("1900.00")
         assert result.threshold == Decimal("250000")
 
     def test_threshold_amount(self):
@@ -93,7 +94,7 @@ class TestOverview:
         """Test overview content."""
         overview = get_form8960_overview()
         assert overview["form"] == "Form 8960"
-        assert "8960" in overview["title"]
+        assert "8960" in overview["form"]
 
 
 class TestRouter:

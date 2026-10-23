@@ -29,22 +29,22 @@ class Form8880Result:
 # 2025 Saver's Credit rates and thresholds
 SAVERS_CREDIT_RATES = {
     "single": [
-        (Decimal("0"), Decimal("21750"), Decimal("0.50")),
-        (Decimal("21750"), Decimal("23625"), Decimal("0.20")),
-        (Decimal("23625"), Decimal("36500"), Decimal("0.10")),
-        (Decimal("36500"), Decimal("999999999"), Decimal("0")),
+        (Decimal("0"), Decimal("23750"), Decimal("0.50")),
+        (Decimal("23750"), Decimal("25500"), Decimal("0.20")),
+        (Decimal("25500"), Decimal("39500"), Decimal("0.10")),
+        (Decimal("39500"), Decimal("999999999"), Decimal("0")),
     ],
     "married_joint": [
-        (Decimal("0"), Decimal("43500"), Decimal("0.50")),
-        (Decimal("43500"), Decimal("47250"), Decimal("0.20")),
-        (Decimal("47250"), Decimal("73000"), Decimal("0.10")),
-        (Decimal("73000"), Decimal("999999999"), Decimal("0")),
+        (Decimal("0"), Decimal("47500"), Decimal("0.50")),
+        (Decimal("47500"), Decimal("51000"), Decimal("0.20")),
+        (Decimal("51000"), Decimal("79000"), Decimal("0.10")),
+        (Decimal("79000"), Decimal("999999999"), Decimal("0")),
     ],
     "head_of_household": [
-        (Decimal("0"), Decimal("32625"), Decimal("0.50")),
-        (Decimal("32625"), Decimal("35438"), Decimal("0.20")),
-        (Decimal("35438"), Decimal("54750"), Decimal("0.10")),
-        (Decimal("54750"), Decimal("999999999"), Decimal("0")),
+        (Decimal("0"), Decimal("35625"), Decimal("0.50")),
+        (Decimal("35625"), Decimal("38250"), Decimal("0.20")),
+        (Decimal("38250"), Decimal("59250"), Decimal("0.10")),
+        (Decimal("59250"), Decimal("999999999"), Decimal("0")),
     ],
 }
 
@@ -59,12 +59,15 @@ def calculate_form8880(inp: Form8880Input) -> Form8880Result:
     # Find applicable rate
     credit_rate = Decimal("0")
     for low, high, rate in rates:
-        if low <= inp.agi < high:
+        # IRS tiers are "AGI not over" limits, i.e. upper bound inclusive
+        if low < inp.agi <= high or (low == 0 and inp.agi <= 0):
             credit_rate = rate
             break
     
     # Calculate credit
-    eligible_contributions = min(inp.retirement_contributions, MAX_CONTRIBUTION_FOR_CREDIT)
+    # $2,000 per person; $4,000 combined on a joint return
+    max_contrib = MAX_CONTRIBUTION_FOR_CREDIT * (2 if inp.filing_status == "married_joint" else 1)
+    eligible_contributions = min(inp.retirement_contributions, max_contrib)
     credit_amount = (eligible_contributions * credit_rate).quantize(Decimal("0.01"))
     
     explanation = (

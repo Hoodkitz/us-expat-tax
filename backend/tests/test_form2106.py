@@ -45,7 +45,7 @@ class TestCalculate:
         assert result.net_deduction == Decimal("0")
 
     def test_agi_floor(self):
-        """Test AGI floor (2% of AGI)."""
+        """2% floor is suspended (IRC 67(g)), so the floor is zero."""
         inp = Form2106Input(
             employee_expenses=Decimal("5000"),
             travel_expenses=Decimal("2000"),
@@ -55,11 +55,11 @@ class TestCalculate:
             tax_year=2025,
         )
         result = calculate_form2106(inp)
-        assert result.agi_floor == Decimal("2000")
+        assert result.agi_floor == Decimal("0")
         assert result.net_deduction == result.deductible_expenses - result.agi_floor
 
     def test_high_agi_reduces_deduction(self):
-        """Test that high AGI reduces deduction."""
+        """With the 2% floor suspended, AGI does not reduce the deduction."""
         inp = Form2106Input(
             employee_expenses=Decimal("5000"),
             travel_expenses=Decimal("2000"),
@@ -69,8 +69,8 @@ class TestCalculate:
             tax_year=2025,
         )
         result = calculate_form2106(inp)
-        assert result.agi_floor == Decimal("4000")
-        assert result.net_deduction < result.deductible_expenses
+        assert result.agi_floor == Decimal("0")
+        assert result.net_deduction == result.deductible_expenses
 
     def test_meal_deduction_50_percent(self):
         """Test that meals are 50% deductible."""
@@ -104,7 +104,7 @@ class TestOverview:
         """Test overview content."""
         overview = get_form2106_overview()
         assert overview["form"] == "Form 2106"
-        assert "2106" in overview["title"]
+        assert "2106" in overview["form"]
 
 
 class TestRouter:

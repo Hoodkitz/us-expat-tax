@@ -34,7 +34,7 @@ def _get_auth_token() -> str:
     """Register a test user and return JWT token."""
     # Register
     client.post(
-        "/api/v1/auth/register",
+        "/auth/register",
         json={
             "email": "test_form8915@example.com",
             "tenant_name": "Test Tenant",
@@ -43,7 +43,7 @@ def _get_auth_token() -> str:
     )
     # Login
     resp = client.post(
-        "/api/v1/auth/login",
+        "/auth/login",
         json={
             "email": "test_form8915@example.com",
             "password": "testpassword123",

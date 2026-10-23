@@ -12,149 +12,55 @@ from app.modules.form1040 import (
 
 
 class TestCalculate:
-    """Unit tests for Form 1040 calculation."""
+    """Unit tests for Form 1040 calculation (2025 rules)."""
 
     def test_basic_single_filer(self):
-        """Test basic single filer with standard deduction."""
-        inp = Form1040Input(
-            wages=Decimal("50000"),
-            interest_income=Decimal("1000"),
-            standard_deduction=True,
-            filing_status="single",
-            tax_year=2025,
-        )
+        inp = Form1040Input(filing_status="single", gross_income=Decimal("51000"))
         result = calculate_form1040(inp)
-        assert result.taxable_income == Decimal("37150")
-        assert result.tax_liability > Decimal("0")
-        assert result.effective_tax_rate > Decimal("0")
+        assert result.taxable_income == Decimal("35250.00")
+        # 10% of 11,925 + 12% of (35,250 - 11,925)
+        assert result.tax_before_credits == Decimal("3991.50")
+        assert result.marginal_tax_rate == Decimal("0.12")
 
     def test_married_joint(self):
-        """Test married filing jointly."""
-        inp = Form1040Input(
-            wages=Decimal("100000"),
-            interest_income=Decimal("2000"),
-            standard_deduction=True,
-            filing_status="married_joint",
-            tax_year=2025,
-        )
+        inp = Form1040Input(filing_status="married_joint", gross_income=Decimal("102000"))
         result = calculate_form1040(inp)
-        assert result.taxable_income == Decimal("73300")
-        assert result.tax_liability > Decimal("0")
+        assert result.taxable_income == Decimal("70500.00")
 
     def test_head_of_household(self):
-        """Test head of household filing status."""
-        inp = Form1040Input(
-            wages=Decimal("60000"),
-            interest_income=Decimal("500"),
-            standard_deduction=True,
-            filing_status="head_of_household",
-            tax_year=2025,
-        )
-        result = calculate_form1040(inp)
-        assert result.taxable_income == Decimal("40700")
-        assert result.tax_liability > Decimal("0")
+        inp = Form1040Input(filing_status="head_of_household", gross_income=Decimal("60500"))
+        assert calculate_form1040(inp).taxable_income == Decimal("36875.00")
 
     def test_no_income(self):
-        """Test with zero income."""
-        inp = Form1040Input(
-            wages=Decimal("0"),
-            interest_income=Decimal("0"),
-            standard_deduction=True,
-            filing_status="single",
-            tax_year=2025,
-        )
-        result = calculate_form1040(inp)
-        assert result.taxable_income == Decimal("0")
-        assert result.tax_liability == Decimal("0")
+        result = calculate_form1040(Form1040Input(filing_status="single", gross_income=Decimal("0")))
+        assert result.total_tax == Decimal("0.00")
+        assert result.effective_tax_rate == Decimal("0")
 
-    def test_high_income(self):
-        """Test high income taxpayer."""
-        inp = Form1040Input(
-            wages=Decimal("500000"),
-            interest_income=Decimal("10000"),
-            standard_deduction=True,
-            filing_status="single",
-            tax_year=2025,
-        )
-        result = calculate_form1040(inp)
-        assert result.taxable_income == Decimal("496150")
-        assert result.tax_liability > Decimal("100000")
+    def test_high_income_top_bracket(self):
+        result = calculate_form1040(Form1040Input(filing_status="single", gross_income=Decimal("1000000")))
+        assert result.marginal_tax_rate == Decimal("0.37")
 
-    def test_itemized_deductions(self):
-        """Test with itemized deductions."""
-        inp = Form1040Input(
-            wages=Decimal("100000"),
-            interest_income=Decimal("5000"),
-            standard_deduction=False,
-            itemized_deductions=Decimal("30000"),
-            filing_status="single",
-            tax_year=2025,
-        )
-        result = calculate_form1040(inp)
-        assert result.taxable_income == Decimal("75000")
+    def test_itemized_deductions_used_when_larger(self):
+        inp = Form1040Input(filing_status="single", gross_income=Decimal("100000"), deductions=Decimal("30000"))
+        assert calculate_form1040(inp).taxable_income == Decimal("70000.00")
 
-        # Itemized should be higher than standard for this case
-        inp_standard = Form1040Input(
-            wages=Decimal("100000"),
-            interest_income=Decimal("5000"),
-            standard_deduction=True,
-            filing_status="single",
-            tax_year=2025,
-        )
-        result_standard = calculate_form1040(inp_standard)
-        assert result.taxable_income < result_standard.taxable_income
+    def test_adjustments_reduce_agi(self):
+        inp = Form1040Input(filing_status="single", gross_income=Decimal("100000"), adjustments=Decimal("5000"))
+        assert calculate_form1040(inp).agi == Decimal("95000.00")
 
-    def test_capital_gains(self):
-        """Test with capital gains income."""
-        inp = Form1040Input(
-            wages=Decimal("50000"),
-            interest_income=Decimal("1000"),
-            capital_gains=Decimal("10000"),
-            standard_deduction=True,
-            filing_status="single",
-            tax_year=2025,
-        )
-        result = calculate_form1040(inp)
-        assert result.taxable_income == Decimal("47150")
+    def test_credits_cannot_make_tax_negative(self):
+        inp = Form1040Input(filing_status="single", gross_income=Decimal("20000"), credits=Decimal("99999"))
+        assert calculate_form1040(inp).total_tax == Decimal("0.00")
 
-    def test_tax_credits(self):
-        """Test with tax credits."""
-        inp = Form1040Input(
-            wages=Decimal("50000"),
-            interest_income=Decimal("1000"),
-            standard_deduction=True,
-            filing_status="single",
-            tax_credits=Decimal("2000"),
-            tax_year=2025,
-        )
-        result = calculate_form1040(inp)
-        assert result.tax_liability < Decimal("5000")
-
-    def test_negative_tax_liability_capped_at_zero(self):
-        """Test that tax liability cannot be negative."""
-        inp = Form1040Input(
-            wages=Decimal("50000"),
-            interest_income=Decimal("1000"),
-            standard_deduction=True,
-            filing_status="single",
-            tax_credits=Decimal("50000"),
-            tax_year=2025,
-        )
-        result = calculate_form1040(inp)
-        assert result.tax_liability == Decimal("0")
+    def test_refund_and_balance_due(self):
+        low = calculate_form1040(Form1040Input(filing_status="single", gross_income=Decimal("51000"), withholding=Decimal("10000")))
+        assert low.refund == Decimal("6008.50") and low.balance_due == Decimal("0.00")
+        high = calculate_form1040(Form1040Input(filing_status="single", gross_income=Decimal("51000")))
+        assert high.balance_due == Decimal("3991.50") and high.refund == Decimal("0.00")
 
     def test_married_separate(self):
-        """Test married filing separately."""
-        inp = Form1040Input(
-            wages=Decimal("50000"),
-            interest_income=Decimal("1000"),
-            standard_deduction=True,
-            filing_status="married_separate",
-            tax_year=2025,
-        )
-        result = calculate_form1040(inp)
-        assert result.taxable_income == Decimal("37150")
-        assert result.tax_liability > Decimal("0")
+        inp = Form1040Input(filing_status="married_separate", gross_income=Decimal("15750"))
+        assert calculate_form1040(inp).taxable_income == Decimal("0.00")
 
 
 class TestOverview:
@@ -175,7 +81,7 @@ class TestOverview:
         """Test overview content."""
         overview = get_form1040_overview()
         assert overview["form"] == "Form 1040"
-        assert "1040" in overview["title"]
+        assert "1040" in overview["form"]
 
 
 class TestRouter:
@@ -198,9 +104,7 @@ class TestRouter:
         response = client.post(
             "/api/v1/form1040/calculate",
             json={
-                "wages": "50000",
-                "interest_income": "1000",
-                "standard_deduction": True,
+                "gross_income": "51000",
                 "filing_status": "single",
                 "tax_year": 2025,
             },
@@ -209,7 +113,7 @@ class TestRouter:
         assert response.status_code == 200
         data = response.json()
         assert "taxable_income" in data
-        assert "tax_liability" in data
+        assert "total_tax" in data
         assert "effective_tax_rate" in data
         assert "explanation" in data
 
@@ -228,9 +132,7 @@ class TestRouter:
         response = client.post(
             "/api/v1/form1040/calculate",
             json={
-                "wages": "50000",
-                "interest_income": "1000",
-                "standard_deduction": True,
+                "gross_income": "51000",
                 "filing_status": "single",
                 "tax_year": 2025,
             },

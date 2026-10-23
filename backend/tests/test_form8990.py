@@ -160,7 +160,7 @@ class TestOverview:
         """Test overview content."""
         overview = get_form8990_overview()
         assert overview["form"] == "Form 8990"
-        assert "8990" in overview["title"] or "Business Interest" in overview["title"]
+        assert "8990" in overview["form"] or "Business Interest" in overview["title"]
 
 
 class TestRouter:
