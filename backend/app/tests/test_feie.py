@@ -15,13 +15,17 @@ from app.modules.feie import (
 class TestFEIELimits:
     """Verify IRS FEIE limits per tax year."""
 
-    def test_2025_limit_is_138300(self):
-        """IRS Rev. Proc. 2024-40: 2025 FEIE limit = $138,300."""
-        assert FEIE_LIMITS[2025] == 138_300.0
+    def test_2025_limit_is_130000(self):
+        """IRS Rev. Proc. 2024-40 sec. 3.39: 2025 FEIE limit = $130,000."""
+        assert FEIE_LIMITS[2025] == 130_000.0
 
-    def test_default_limit_matches_2025(self):
+    def test_2026_limit_is_132900(self):
+        """IRS Rev. Proc. 2025-32 sec. 3.39: 2026 FEIE limit = $132,900."""
+        assert FEIE_LIMITS[2026] == 132_900.0
+
+    def test_default_limit_matches_latest_year(self):
         """Default limit should match the most recent tax year."""
-        assert DEFAULT_FEIE_LIMIT == 138_300.0
+        assert DEFAULT_FEIE_LIMIT == FEIE_LIMITS[max(FEIE_LIMITS)]
 
     def test_all_limits_are_monotonically_increasing(self):
         """FEIE limits should never decrease year-over-year."""
@@ -53,12 +57,12 @@ class TestFEIECalculation:
         )
         result = calculate_feie(inp)
         assert result.qualifies is True
-        assert result.feie_limit == 138_300.0
+        assert result.feie_limit == 130_000.0
         assert result.feie_exclusion == 100_000.0
         assert result.taxable_income_estimate == 0.0
 
     def test_2025_excess_income_capped(self):
-        """Income above 2025 limit is capped at $138,300."""
+        """Income above 2025 limit is capped at $130,000."""
         inp = FEIEInput(
             tax_year=2025,
             foreign_earned_income=200_000.0,
@@ -69,14 +73,14 @@ class TestFEIECalculation:
         )
         result = calculate_feie(inp)
         assert result.qualifies is True
-        assert result.feie_exclusion == 138_300.0
-        assert result.taxable_income_estimate == 61_700.0
+        assert result.feie_exclusion == 130_000.0
+        assert result.taxable_income_estimate == 70_000.0
 
     def test_2025_housing_exclusion(self):
         """Housing exclusion uses 2025 limit for base amount."""
         inp = FEIEInput(
             tax_year=2025,
-            foreign_earned_income=138_300.0,
+            foreign_earned_income=130_000.0,
             housing_costs=50_000.0,
             days_in_foreign_country=365,
             bona_fide_resident=False,
@@ -84,11 +88,11 @@ class TestFEIECalculation:
         )
         result = calculate_feie(inp)
         assert result.qualifies is True
-        # Base = 16% of 138,300 = 22,128
-        assert result.housing_base_amount == pytest.approx(22_128.0)
+        # Base = 16% of 130,000 = 20,800
+        assert result.housing_base_amount == pytest.approx(20_800.0)
         # Net housing = 50,000 - 0 = 50,000
-        # Exclusion = min(50,000 - 22,128, 30% * 138,300) = min(27,872, 41,490) = 27,872
-        assert result.housing_exclusion == pytest.approx(27_872.0)
+        # Exclusion = min(50,000 - 20,800, 30% * 130,000) = min(29,200, 39,000) = 29,200
+        assert result.housing_exclusion == pytest.approx(29_200.0)
 
     def test_not_qualified_no_exclusion(self):
         """Taxpayer not meeting either test gets no exclusion."""
