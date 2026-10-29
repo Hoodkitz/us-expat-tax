@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Repository auschecken
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: AWS-Credentials konfigurieren
         uses: aws-actions/configure-aws-credentials@v4
