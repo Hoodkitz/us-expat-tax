@@ -11,8 +11,19 @@ from pydantic import BaseModel, Field
 
 # 2025 Tax Constants
 MEDICAL_EXPENSE_AGI_FLOOR = 0.075  # 7.5% of AGI
-SALT_CAP = 10_000.0  # $10,000 cap ($5,000 if MFS)
-SALT_CAP_MFS = 5_000.0  # $5,000 cap for married filing separately
+# SALT cap TY2025: $40,000 ($20,000 MFS), reduced by 30% of MAGI over $500,000
+# ($250,000 MFS), floor $10,000 ($5,000 MFS).
+# Source: IRS Instructions for Schedule A (2025), line 5e + State and Local Tax Deduction
+# Worksheet, https://www.irs.gov/instructions/i1040sca
+# TY2026 amount NOT verified from a primary source yet -> not implemented (see plan).
+SALT_CAP = 40_000.0
+SALT_CAP_MFS = 20_000.0
+SALT_PHASEOUT_RATE = 0.30
+SALT_PHASEOUT_THRESHOLD = 500_000.0
+SALT_PHASEOUT_THRESHOLD_MFS = 250_000.0
+SALT_FLOOR = 10_000.0
+SALT_FLOOR_MFS = 5_000.0
+SALT_VERIFIED_YEARS = {2025}
 MORTGAGE_INTEREST_DEBT_CAP = 750_000.0  # $750k debt limit (post-2017)
 CHARITABLE_CASH_AGI_LIMIT = 0.60  # 60% of AGI for cash contributions
 
@@ -32,6 +43,10 @@ class ScheduleAInput(BaseModel):
     casualty_theft_losses: float = Field(default=0.0, description="Casualty/theft losses (federal disasters only)")
     filing_status: FilingStatus = Field(default="single", description="Tax filing status")
     tax_year: int = Field(default=2025, description="Tax year (2025 or 2026)")
+    foreign_excluded_income: float = Field(
+        default=0.0,
+        description="Income excluded via Form 2555/4563 or Puerto Rico; added to AGI for the SALT phase-out MAGI",
+    )
 
 
 class ScheduleAResult(BaseModel):
@@ -74,7 +89,7 @@ def calculate_schedule_a(input_data: ScheduleAInput) -> ScheduleAResult:
 
     Rules:
     1. Medical expenses: Only amount exceeding 7.5% of AGI is deductible
-    2. SALT: Capped at $10,000 ($5,000 if married filing separately)
+    2. SALT: Capped at $40,000 ($20,000 MFS) for 2025, phased down above $500,000 MAGI
     3. Mortgage interest: Deductible on up to $750,000 of debt (post-2017)
     4. Charitable contributions: Up to 60% of AGI for cash contributions
     5. Casualty/theft losses: Only federally declared disasters (no limitation %)
@@ -86,7 +101,17 @@ def calculate_schedule_a(input_data: ScheduleAInput) -> ScheduleAResult:
     medical_deductible = max(0.0, input_data.medical_expenses - medical_floor)
 
     # 2. SALT cap
-    salt_cap = SALT_CAP_MFS if input_data.filing_status == "married_filing_separately" else SALT_CAP
+    mfs = input_data.filing_status == "married_filing_separately"
+    if input_data.state_local_taxes > 0 and input_data.tax_year not in SALT_VERIFIED_YEARS:
+        raise ValueError(
+            f"SALT cap for tax year {input_data.tax_year} is not verified against an IRS primary source yet"
+        )
+    salt_cap = SALT_CAP_MFS if mfs else SALT_CAP
+    threshold = SALT_PHASEOUT_THRESHOLD_MFS if mfs else SALT_PHASEOUT_THRESHOLD
+    floor = SALT_FLOOR_MFS if mfs else SALT_FLOOR
+    magi = input_data.adjusted_gross_income + input_data.foreign_excluded_income
+    if magi > threshold:
+        salt_cap = max(salt_cap - SALT_PHASEOUT_RATE * (magi - threshold), floor)
     salt_deductible = min(input_data.state_local_taxes, salt_cap)
 
     # 3. Mortgage interest: deductible on up to $750k debt
@@ -185,7 +210,7 @@ def get_schedule_a_overview() -> dict:
         },
         "calculation_steps": [
             "1. Medical expenses: Subtract 7.5% of AGI from total medical expenses",
-            "2. SALT: Apply $10,000 cap ($5,000 if MFS)",
+            "2. SALT: Apply $40,000 cap ($20,000 MFS), reduced 30% of MAGI over $500,000 (floor $10,000)",
             "3. Mortgage interest: Prorate if debt exceeds $750,000",
             "4. Charitable contributions: Apply 60% of AGI limit",
             "5. Casualty/theft losses: Include if federally declared disaster",
@@ -193,7 +218,7 @@ def get_schedule_a_overview() -> dict:
         ],
         "notes": [
             "Taxpayers should itemize only if total itemized deductions exceed the standard deduction",
-            "The SALT cap was introduced by the Tax Cuts and Jobs Act of 2017",
+            "The SALT cap was introduced by the TCJA (2017) and raised for 2025 by the OBBBA",
             "Medical expense threshold was temporarily lowered to 7.5% for all taxpayers in 2023+",
             "Casualty losses are now only deductible for federally declared disasters",
         ],

@@ -82,37 +82,37 @@ class TestScheduleACalculations:
         assert result.salt_deductible == 8_000.0
 
     def test_salt_at_cap(self):
-        """SALT exactly at $10,000 cap should be fully deductible."""
+        """SALT exactly at $40,000 (2025) cap should be fully deductible."""
         input_data = ScheduleAInput(
             adjusted_gross_income=100_000.0,
-            state_local_taxes=10_000.0,
+            state_local_taxes=40_000.0,
             filing_status="single",
         )
         result = calculate_schedule_a(input_data)
 
-        assert result.salt_deductible == 10_000.0
+        assert result.salt_deductible == 40_000.0
 
     def test_salt_above_cap(self):
-        """SALT above $10,000 cap should be capped at $10,000."""
+        """SALT above $40,000 cap should be capped at $40,000."""
         input_data = ScheduleAInput(
             adjusted_gross_income=100_000.0,
-            state_local_taxes=15_000.0,
+            state_local_taxes=45_000.0,
             filing_status="single",
         )
         result = calculate_schedule_a(input_data)
 
-        assert result.salt_deductible == 10_000.0
+        assert result.salt_deductible == 40_000.0
 
     def test_salt_cap_married_filing_separately(self):
-        """SALT cap for married filing separately should be $5,000."""
+        """SALT cap for married filing separately should be $20,000 (2025)."""
         input_data = ScheduleAInput(
             adjusted_gross_income=100_000.0,
-            state_local_taxes=8_000.0,
+            state_local_taxes=25_000.0,
             filing_status="married_filing_separately",
         )
         result = calculate_schedule_a(input_data)
 
-        assert result.salt_deductible == 5_000.0
+        assert result.salt_deductible == 20_000.0
 
     def test_mortgage_interest_within_debt_limit(self):
         """Mortgage interest on debt within $750k limit should be fully deductible."""
@@ -271,16 +271,16 @@ class TestScheduleACalculations:
 
         # Medical: 15,000 - 11,250 = 3,750
         assert result.medical_expenses_deductible == 3_750.0
-        # SALT: capped at 10,000
-        assert result.salt_deductible == 10_000.0
+        # SALT: below the 2025 cap -> fully deductible
+        assert result.salt_deductible == 12_000.0
         # Mortgage: fully deductible (within limit)
         assert result.mortgage_interest_deductible == 10_000.0
         # Charitable: fully deductible (below 60% limit)
         assert result.charitable_contributions_deductible == 40_000.0
         # Casualty: fully deductible
         assert result.casualty_theft_losses_deductible == 2_000.0
-        # Total: 3,750 + 10,000 + 10,000 + 40,000 + 2,000 = 65,750
-        assert result.total_itemized_deductions == 65_750.0
+        # Total: 3,750 + 12,000 + 10,000 + 40,000 + 2,000 = 67,750
+        assert result.total_itemized_deductions == 67_750.0
         assert result.use_itemized is True
 
     def test_rounding_precision(self):
@@ -349,7 +349,7 @@ class TestScheduleAOverview:
         assert "casualty_theft_losses" in rules
 
         assert rules["medical_expenses"]["floor"] == "7.5% of AGI"
-        assert rules["salt"]["cap"] == "$10,000"
+        assert rules["salt"]["cap"] == "$40,000"
         assert rules["mortgage_interest"]["debt_cap"] == "$750,000"
         assert rules["charitable_contributions"]["agi_limit"] == "60%"
 
@@ -370,3 +370,31 @@ def test_standard_deduction_2026_and_hoh():
     assert calculate_schedule_a(ScheduleAInput(**base, tax_year=2026, filing_status="married_filing_jointly")).standard_deduction == 32_200.0
     assert calculate_schedule_a(ScheduleAInput(**base, tax_year=2026, filing_status="head_of_household")).standard_deduction == 24_150.0
     assert calculate_schedule_a(ScheduleAInput(**base, filing_status="head_of_household")).standard_deduction == 23_625.0
+
+
+def test_salt_phaseout_and_floor_2025():
+    """IRS Schedule A instr. 2025 worksheet: 40,000 - 30% * (MAGI - 500,000), floor 10,000."""
+    from app.modules.schedule_a import ScheduleAInput, calculate_schedule_a
+    r = calculate_schedule_a(ScheduleAInput(adjusted_gross_income=550_000.0, state_local_taxes=60_000.0))
+    assert r.salt_deductible == 25_000.0
+    r = calculate_schedule_a(ScheduleAInput(adjusted_gross_income=900_000.0, state_local_taxes=60_000.0))
+    assert r.salt_deductible == 10_000.0
+    # MFS: 20,000 - 30% * (300,000 - 250,000) = 5,000 floor boundary -> 5,000
+    r = calculate_schedule_a(ScheduleAInput(adjusted_gross_income=300_000.0, state_local_taxes=60_000.0,
+                                            filing_status="married_filing_separately"))
+    assert r.salt_deductible == 5_000.0
+
+
+def test_salt_foreign_excluded_income_counts_for_magi():
+    from app.modules.schedule_a import ScheduleAInput, calculate_schedule_a
+    r = calculate_schedule_a(ScheduleAInput(adjusted_gross_income=450_000.0, foreign_excluded_income=130_000.0,
+                                            state_local_taxes=60_000.0))
+    # MAGI 580,000 -> 40,000 - 24,000 = 16,000
+    assert r.salt_deductible == 16_000.0
+
+
+def test_salt_2026_not_verified_raises():
+    import pytest
+    from app.modules.schedule_a import ScheduleAInput, calculate_schedule_a
+    with pytest.raises(ValueError):
+        calculate_schedule_a(ScheduleAInput(adjusted_gross_income=100_000.0, state_local_taxes=5_000.0, tax_year=2026))
