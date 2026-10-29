@@ -33,8 +33,8 @@ class TestScheduleACalculations:
         assert result.charitable_contributions_deductible == 0.0
         assert result.casualty_theft_losses_deductible == 0.0
         assert result.total_itemized_deductions == 0.0
-        assert result.standard_deduction == 15_000.0
-        assert result.recommended_deduction == 15_000.0
+        assert result.standard_deduction == 15_750.0
+        assert result.recommended_deduction == 15_750.0
         assert result.use_itemized is False
 
     def test_medical_expenses_below_floor(self):
@@ -211,7 +211,7 @@ class TestScheduleACalculations:
         # Total itemized: 5,000 + 10,000 + 15,000 + 50,000 = 80,000
         # Standard deduction: 15,000
         assert result.total_itemized_deductions == 80_000.0
-        assert result.standard_deduction == 15_000.0
+        assert result.standard_deduction == 15_750.0
         assert result.recommended_deduction == 80_000.0
         assert result.use_itemized is True
 
@@ -231,19 +231,19 @@ class TestScheduleACalculations:
         # Total itemized: 0 + 5,000 + 3,000 + 1,000 = 9,000
         # Standard deduction: 15,000
         assert result.total_itemized_deductions == 9_000.0
-        assert result.standard_deduction == 15_000.0
-        assert result.recommended_deduction == 15_000.0
+        assert result.standard_deduction == 15_750.0
+        assert result.recommended_deduction == 15_750.0
         assert result.use_itemized is False
 
     def test_married_filing_jointly_standard_deduction(self):
-        """Married filing jointly should have $30,000 standard deduction."""
+        """Married filing jointly should have $31,500 standard deduction."""
         input_data = ScheduleAInput(
             adjusted_gross_income=100_000.0,
             filing_status="married_filing_jointly",
         )
         result = calculate_schedule_a(input_data)
 
-        assert result.standard_deduction == 30_000.0
+        assert result.standard_deduction == 31_500.0
 
     def test_married_filing_separately_standard_deduction(self):
         """Married filing separately should have $15,000 standard deduction."""
@@ -253,7 +253,7 @@ class TestScheduleACalculations:
         )
         result = calculate_schedule_a(input_data)
 
-        assert result.standard_deduction == 15_000.0
+        assert result.standard_deduction == 15_750.0
 
     def test_comprehensive_itemized_deductions(self):
         """Test comprehensive calculation with all deduction types."""
@@ -358,6 +358,15 @@ class TestScheduleAOverview:
         overview = get_schedule_a_overview()
         std = overview["standard_deduction_2025"]
 
-        assert std["single"] == "$15,000"
-        assert std["married_filing_jointly"] == "$30,000"
-        assert std["married_filing_separately"] == "$15,000"
+        assert std["single"] == "$15,750"
+        assert std["married_filing_jointly"] == "$31,500"
+        assert std["married_filing_separately"] == "$15,750"
+
+def test_standard_deduction_2026_and_hoh():
+    """Rev. Proc. 2025-32 sec. 3.14 values for 2026; HoH for 2025 per OBBBA."""
+    from app.modules.schedule_a import ScheduleAInput, calculate_schedule_a
+    base = dict(adjusted_gross_income=100_000.0)
+    assert calculate_schedule_a(ScheduleAInput(**base, tax_year=2026)).standard_deduction == 16_100.0
+    assert calculate_schedule_a(ScheduleAInput(**base, tax_year=2026, filing_status="married_filing_jointly")).standard_deduction == 32_200.0
+    assert calculate_schedule_a(ScheduleAInput(**base, tax_year=2026, filing_status="head_of_household")).standard_deduction == 24_150.0
+    assert calculate_schedule_a(ScheduleAInput(**base, filing_status="head_of_household")).standard_deduction == 23_625.0

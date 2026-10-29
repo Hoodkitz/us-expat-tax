@@ -14,9 +14,12 @@ FEIE_LIMITS: dict[int, float] = {
     2022: 112_000.0,
     2023: 120_000.0,
     2024: 126_500.0,
-    2025: 138_300.0,
+    # Sources: Rev. Proc. 2024-40 sec. 3.39 (2025: $130,000);
+    # Rev. Proc. 2025-32 sec. 3.39 (2026: $132,900), https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
+    2025: 130_000.0,
+    2026: 132_900.0,
 }
-DEFAULT_FEIE_LIMIT = 138_300.0
+DEFAULT_FEIE_LIMIT = FEIE_LIMITS[max(FEIE_LIMITS)]
 
 FilingStatus = Literal[
     "single",

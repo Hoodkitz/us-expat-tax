@@ -16,7 +16,9 @@ SALT_CAP_MFS = 5_000.0  # $5,000 cap for married filing separately
 MORTGAGE_INTEREST_DEBT_CAP = 750_000.0  # $750k debt limit (post-2017)
 CHARITABLE_CASH_AGI_LIMIT = 0.60  # 60% of AGI for cash contributions
 
-FilingStatus = Literal["single", "married_filing_jointly", "married_filing_separately"]
+FilingStatus = Literal[
+    "single", "married_filing_jointly", "married_filing_separately", "head_of_household"
+]
 
 
 class ScheduleAInput(BaseModel):
@@ -29,6 +31,7 @@ class ScheduleAInput(BaseModel):
     charitable_contributions: float = Field(default=0.0, description="Charitable cash contributions")
     casualty_theft_losses: float = Field(default=0.0, description="Casualty/theft losses (federal disasters only)")
     filing_status: FilingStatus = Field(default="single", description="Tax filing status")
+    tax_year: int = Field(default=2025, description="Tax year (2025 or 2026)")
 
 
 class ScheduleAResult(BaseModel):
@@ -45,12 +48,24 @@ class ScheduleAResult(BaseModel):
     use_itemized: bool
 
 
-# 2025 Standard Deduction amounts
-STANDARD_DEDUCTION_2025: dict[str, float] = {
-    "single": 15_000.0,
-    "married_filing_jointly": 30_000.0,
-    "married_filing_separately": 15_000.0,
+# Basic standard deduction by tax year.
+# 2025: IRC 63(c)(7) as amended by OBBBA sec. 70102 (see Rev. Proc. 2025-32 sec. 2.08).
+# 2026: Rev. Proc. 2025-32 sec. 3.14, https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
+STANDARD_DEDUCTION: dict[int, dict[str, float]] = {
+    2025: {
+        "single": 15_750.0,
+        "married_filing_jointly": 31_500.0,
+        "married_filing_separately": 15_750.0,
+        "head_of_household": 23_625.0,
+    },
+    2026: {
+        "single": 16_100.0,
+        "married_filing_jointly": 32_200.0,
+        "married_filing_separately": 16_100.0,
+        "head_of_household": 24_150.0,
+    },
 }
+STANDARD_DEDUCTION_2025 = STANDARD_DEDUCTION[2025]
 
 
 def calculate_schedule_a(input_data: ScheduleAInput) -> ScheduleAResult:
@@ -101,7 +116,10 @@ def calculate_schedule_a(input_data: ScheduleAInput) -> ScheduleAResult:
     )
 
     # Standard deduction for 2025
-    standard = STANDARD_DEDUCTION_2025.get(input_data.filing_status, 15_000.0)
+    table = STANDARD_DEDUCTION.get(input_data.tax_year)
+    if table is None:
+        raise ValueError(f"Standard deduction not available for tax year {input_data.tax_year}")
+    standard = table[input_data.filing_status]
 
     # Recommend the larger of itemized vs standard
     use_itemized = total_itemized > standard
