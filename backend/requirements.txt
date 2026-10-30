@@ -2,8 +2,8 @@ fastapi==0.142.*
 uvicorn[standard]==0.54.*
 sympy==1.13.*
 httpx==0.28.*
-pydantic==2.9.*
-pydantic[email]>=2.9
+pydantic==2.14.*
+pydantic[email]>=2.14.1
 opencv-python-headless==5.0.*
 pytesseract==0.3.*
 langchain==0.3.*
