@@ -3,7 +3,7 @@ uvicorn[standard]==0.54.*
 sympy==1.14.*
 httpx==0.28.*
 pydantic==2.14.*
-pydantic[email]>=2.14.1
+pydantic[email]>=2.14.3
 opencv-python-headless==5.0.*
 pytesseract==0.3.*
 langchain==0.3.*
